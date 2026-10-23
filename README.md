@@ -4,12 +4,17 @@
 плата `bengal`). Оболочка и программы — общие, в [Haltia](https://github.com/haltia-de/haltia).
 Решения порта — в [плане](https://github.com/haltia-de/haltia/blob/main/docs/plans/tab-p11.md).
 
-> **Прошивать нечего.** Репозиторий заведён 23 октября 2026. Образа,
-> ядра и установщика здесь ещё нет. Запись на подключённый планшет
-> запрещена, пока автор не скажет отдельно.
+> **Прошивать нечего.** Репозиторий заведён 23 октября 2026. Образа
+> для записи здесь ещё нет. Загрузчик лабораторного экземпляра открыт,
+> Android снова работает со слота B. Копий `boot`, `dtbo`, `vbmeta`,
+> `modemst`, `fsg`, `fsc` и `persist` ещё нет, поэтому разделы не
+> записываются и активным не делается слот A. Одноразовый образ из
+> дерева J606F уже загружался и увёл планшет в перезагрузки. Его судьба
+> записана в ADR 0101.
 
 *English summary: the device layer for the Lenovo Tab P11 TB-J606L. No
-boot image is published from this repository yet. Do not flash it.*
+boot image is published from this repository yet. Do not flash the
+tablet. Do not boot the J606F one-shot image again.*
 
 ## Для какого устройства
 
@@ -24,8 +29,8 @@ boot image is published from this repository yet. Do not flash it.*
 
 | Узел | Состояние |
 |---|---|
-| Загрузчик | заперт, OEM-разблокировка разрешена. Разблокировка стирает данные |
-| Слоты A/B | Android сейчас на слоте B. Haltia по плану займёт неактивный слот |
+| Загрузчик | открыт 23 октября 2026, состояние orange. `userdata` стёрт. В разделы образ не записывался. Android снова на слоте B |
+| Слоты A/B | Android на слоте B. Слот A вечером того же дня в загрузку не пошёл. Haltia по плану займёт неактивный слот только после копий |
 | Экран 1200×2000, 60 Гц, плотность 240 | в Android работает. В основном ядре для J606F есть панель Novatek NT36523W и simplefb. На этом J606L не проверялось |
 | Касание Novatek | в Android есть (`NVTCapacitiveTouchScreen`). В дереве J606F узла касания нет |
 | Звук, зарядка, сон, Wi-Fi, поворот | в Android есть. В строке реестра Haltia основное ядро на этой модели поднимается без касания, звука и зарядки |
