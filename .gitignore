@@ -1,0 +1,10 @@
+artifacts/
+backups/
+build/
+external/
+*.ko
+*.img
+*.mbn
+
+__pycache__/
+CLAUDE.local.md
