@@ -1,0 +1,122 @@
+{
+  "schema": 1,
+  "scope": "plain publishable RAM diagnostic sources only",
+  "contains_git": false,
+  "contains_kernel_tree": false,
+  "contains_generated_binaries": false,
+  "contains_private_identity": false,
+  "files": {
+    ".dockerignore": {
+      "bytes": 53,
+      "sha256": "dfa8dcaff00e1a0412bbd83711c0bd66a96dae5f21f5cd6814621b4fb6a103d4"
+    },
+    ".gitignore": {
+      "bytes": 131,
+      "sha256": "2bc81d755d5928dacf9ae6a11342c60eb54f3554045ac478cde6fdfe0990cb62"
+    },
+    "Dockerfile.toolchain": {
+      "bytes": 2209,
+      "sha256": "b099118947bf4fa990fc0e1e85e1672b235816176d5d736b06500dd64f2a2328"
+    },
+    "FIRST-TEST.md": {
+      "bytes": 11761,
+      "sha256": "de4848e01c068fc1997a119ad556791e8e3db8d7ecf57a646f0dc1cbb3ccf252"
+    },
+    "LICENSE": {
+      "bytes": 17882,
+      "sha256": "77dc7854b1bdc02d96ab5e531e1023482c94dc4a24d28637e2d3d26554b33346"
+    },
+    "README.md": {
+      "bytes": 7414,
+      "sha256": "5c5ce2da5cbdf6fb7a6c91c1b8cfdb89e3470c3185a2cceb66ef02cb0c1f79ee"
+    },
+    "VALIDATION.json": {
+      "bytes": 803,
+      "sha256": "ef7bfcd7aa95bcaffc48a95625129ea048b7967f856af266619c989da6de5e7a"
+    },
+    "build.py": {
+      "bytes": 10061,
+      "sha256": "797901be69036ffa11b652ed7dd13ba45e517bb3fb698d0b068cded070d8b0a9"
+    },
+    "check_dtb.py": {
+      "bytes": 2027,
+      "sha256": "08782b5aebd7e72226c8d012a0571d086c2611648cf41c0130e59cb41206bcf9"
+    },
+    "diag_io.c": {
+      "bytes": 3495,
+      "sha256": "4b316f1eed9e1b29bfc8537e41288d1f1dc9d443d50cdfe5c6541a8fdaf4c41b"
+    },
+    "diag_io.h": {
+      "bytes": 849,
+      "sha256": "77a6ff82858d24058e0f9e1c05fbb4726b06f1f5f615e2fa90c946f3e27b4b6b"
+    },
+    "fdt.py": {
+      "bytes": 2058,
+      "sha256": "93c3bced58fe13879b09202e5455492c2cdf7ba281e220e2a54fdce15b0b81a8"
+    },
+    "init.c": {
+      "bytes": 6871,
+      "sha256": "457f931defaaf80dc109fa7a976a65e8ec6dbeb645e1aa44e04a756b73b0dea6"
+    },
+    "mkbootimg.py": {
+      "bytes": 13371,
+      "sha256": "5579fb6bcb9e89e790a70fb9ccf3c00cf56e3e46aef74d84fcb0964887e5576e"
+    },
+    "offline_tests.py": {
+      "bytes": 1387,
+      "sha256": "ccd4d59683fdeabe587c7178e5a060027a7a4c58d1d3cfed4e938042fba3cf9d"
+    },
+    "package.py": {
+      "bytes": 5857,
+      "sha256": "d239268f6a9dc15cc1cb67e2e064ae047a8eab42ea3d166e9da2fcf1a83b28a1"
+    },
+    "proof.py": {
+      "bytes": 2268,
+      "sha256": "f3cb5dac44d5e1d7514776e1d5e451fcf6fc1a9dd85cc6a9d7602479b8bd7fbd"
+    },
+    "ramdiag.config": {
+      "bytes": 2088,
+      "sha256": "568697e5d3a6f331fe3868c4e5ffc2bae15475bc53bcee9c9f95c4c0368e81d7"
+    },
+    "sm6115-lenovo-j606l-ramdiag.dts": {
+      "bytes": 1391,
+      "sha256": "1e6d5bc4b5dbff27c6eeca11b584596f2acb52e24bf0a25f911c5774bc73f61f"
+    },
+    "source-comparison.json": {
+      "bytes": 525,
+      "sha256": "b8f75e9894e807b385e9a05ad163bac82fcff6186a5733466bfc886229471b2e"
+    },
+    "stock-header.json": {
+      "bytes": 631,
+      "sha256": "b8f208eb91a7c080ba1ecf0ba44c4fa6530437969c5c679de539336d63d5e91c"
+    },
+    "test_diag_io.c": {
+      "bytes": 4284,
+      "sha256": "b0d0b9b42cb90c561e0c71ac42cc935de39c2e37be996caf2be6435a7246b372"
+    },
+    "test_package.py": {
+      "bytes": 1573,
+      "sha256": "963a6a8f8306d6b30756929a6c9494fd13c33e58932f55ae12100a62f27c04b8"
+    },
+    "test_proof.py": {
+      "bytes": 3885,
+      "sha256": "111d136b1412b3fb4276c43e8c1d776723696e3f3c5e254353a1b4d4029044d1"
+    },
+    "test_watch_usb.py": {
+      "bytes": 4401,
+      "sha256": "097f1ff4627d36e902ad3385ae6b9fac876f21454094267381f22fadd44836fd"
+    },
+    "toolchain-packages.lock.tsv": {
+      "bytes": 6211,
+      "sha256": "38463fdaad053503a058cfb2aa386ff6a1312bc6bccc6fa8a0a56e9fae44e5d0"
+    },
+    "verification.json": {
+      "bytes": 1674,
+      "sha256": "d4e4263ec5f2ab1c54e9c7f3c0eb9b41561d2f8258e61a7c23276f4cb75610e5"
+    },
+    "watch_usb.py": {
+      "bytes": 7856,
+      "sha256": "a37da88f2ac4c6fa8f7578245b9c5b61c5ddcb24e166ddb33bfadfecd629e4a0"
+    }
+  }
+}

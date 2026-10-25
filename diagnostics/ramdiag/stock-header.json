@@ -1,0 +1,22 @@
+{
+  "stock_firmware": "TB-J606L_S320317_230810_ROW",
+  "stock_boot_b_sha256": "7b9a0a61dd1ae396b93af25e27a973cac5e3ff9d2ccd4d9137e507b86b053b1d",
+  "header": {
+    "kernel_size": 15260874,
+    "kernel_addr": 32768,
+    "ramdisk_size": 1149678,
+    "ramdisk_addr": 16777216,
+    "second_size": 0,
+    "second_addr": 0,
+    "tags_addr": 256,
+    "page_size": 4096,
+    "header_version": 2,
+    "os_version_word": 369099127,
+    "header_size": 1660,
+    "dtb_size": 3126185,
+    "dtb_addr": 32505856
+  },
+  "security_patch": "2023-07",
+  "os_version": "11.0.0",
+  "evidence": "Exact accepted stock B capture; no image distributed."
+}

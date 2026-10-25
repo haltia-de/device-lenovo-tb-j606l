@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+# Outputs, kernel checkouts and private captures belong outside this source tree.
+*.img
+*.bin
+*.elf
+*.private.*

@@ -1,0 +1,19 @@
+{
+  "reconstructed_image": "sha256:b2bed76c6f4dbc90ae597e2b9ef7c51cfe1fbf70310c42eeccfcc152c96cc4b5",
+  "official_base": "ubuntu@sha256:68ee22004a9109b44973313b02ff7b1de250f1de0f5ecb628d73f579aaff33ac",
+  "snapshot": "20261024T000000Z",
+  "exact_packages": 179,
+  "package_lock_sha256": "38463fdaad053503a058cfb2aa386ff6a1312bc6bccc6fa8a0a56e9fae44e5d0",
+  "reconstruction_verified": true,
+  "full_portable_kernel_build_verified": true,
+  "packaging_runtime": {
+    "python": "3.12.3",
+    "zlib_compile": "1.3",
+    "zlib_runtime": "1.3"
+  },
+  "staged_python_tests_passed": 13,
+  "reconstructed_image_native_pty_tests_passed": true,
+  "full_boot_sha256": "a9990c894d1a60f6bd06140cd34e6aa848b9880094059a6ba5780a2051ea4ff2",
+  "independent_validation": "verification.json",
+  "hardware_tested": false
+}

@@ -1,0 +1,10 @@
+{
+  "cached_fork": "https://github.com/TeamYogaBlade2/linux.git",
+  "kernel_pin": "7dd245445adf6eaa27018cf92fbd5a92ec0b118e",
+  "official_dts_pin": "7a78f7ba9f24962c8033e0152bf34a7903ff61ba",
+  "j606f_dts_sha256": "8664cb3e3d74011fbd20cd55df69266e06ddb44d2e0daa037fae8881881f428e",
+  "j606f_dts_and_pm6125_identical": true,
+  "sm6115_differences": "Whitespace/USB TODO and upstream disabled Venus node absent from cache.",
+  "usb_binding_difference": "Description punctuation only.",
+  "full_kernel_trees_identical": false
+}
