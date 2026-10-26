@@ -34,6 +34,11 @@ packs the modules as `<work>/modules.tar` for `rootfs/build-rootfs.sh`
   amplifier's register profile from the stock `awinic/aw882xx_acf.bin` and
   turns the profile's four-slot TDM frame into the two-slot I2S frame the
   LPASS primary MI2S port sends.
+- `0007` driver for the ES7210 microphone ADC (Everest's Tab P11 register
+  sequences from Lenovo's sources) and secondary MI2S capture in the
+  sm8250 machine driver: 24-bit samples in 32-bit slots. The microphones
+  pass through a DSP Group DBMD8 voice processor, which has no driver yet,
+  so capture carries noise only.
 
 The touch firmware (`novatek_ts_fw.bin`) and the modem images are Lenovo's
 and stay out of the repository: `rootfs/haltia-firmware` copies them from
