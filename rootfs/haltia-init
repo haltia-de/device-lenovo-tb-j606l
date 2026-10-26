@@ -18,6 +18,9 @@ if [ -d /sys/kernel/config/usb_gadget ] && [ ! -d $g ]; then
 	echo "Haltia" > $g/strings/0x409/manufacturer
 	echo "Lenovo Tab P11 TB-J606L" > $g/strings/0x409/product
 	echo "Haltia" > $g/configs/c.1/strings/0x409/configuration
+	# Fixed addresses, so the host keeps one interface name across boots.
+	echo 02:4a:36:06:00:02 > $g/functions/ncm.usb0/dev_addr
+	echo 02:4a:36:06:00:01 > $g/functions/ncm.usb0/host_addr
 	ln -s $g/functions/acm.usb0 $g/configs/c.1/
 	ln -s $g/functions/ncm.usb0 $g/configs/c.1/
 	for i in $(seq 1 50); do udc=$(ls /sys/class/udc 2>/dev/null | head -1); [ -n "$udc" ] && break; sleep 0.1; done

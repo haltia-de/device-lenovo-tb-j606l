@@ -65,9 +65,21 @@ install -D -m 644 "$SRC/rootfs/android.desktop" "$ROOT/usr/share/applications/ha
 install -D -m 755 "$SRC/rootfs/desktop.start" "$ROOT/etc/local.d/desktop.start"
 mkdir -p "$ROOT/etc/haltia"
 echo "$PACKAGES" | tr -s ' \t\n' '\n' | sed '/^$/d' > "$ROOT/etc/haltia/firstboot.packages"
-mkdir -p "$ROOT/var/lib/haltia"
+mkdir -p "$ROOT/var/lib/haltia" "$ROOT/etc/modprobe.d"
+# The picture is the bootloader's framebuffer through simpledrm. The display
+# clock controller has no consumer while MDSS is off, so once loaded it
+# powers the MDSS domain down and the screen goes dark.
+printf 'blacklist dispcc_sm6115\n' > "$ROOT/etc/modprobe.d/haltia-display.conf"
 # DEBUG=1 adds a passwordless USB root shell for development.
-[ "${DEBUG:-0}" != 1 ] || touch "$ROOT/etc/haltia/debug-shell"
+if [ "${DEBUG:-0}" = 1 ]; then
+	touch "$ROOT/etc/haltia/debug-shell"
+	# SSH_KEY: a public key for root over the USB network (10.15.0.2).
+	if [ -n "${SSH_KEY:-}" ]; then
+		install -d -m 700 "$ROOT/root/.ssh"
+		echo "$SSH_KEY" > "$ROOT/root/.ssh/authorized_keys"
+		chmod 600 "$ROOT/root/.ssh/authorized_keys"
+	fi
+fi
 
 if [ -n "${KERNEL_TAR:-}" ]; then
 	tar -C "$ROOT" -xf "$KERNEL_TAR"
