@@ -1,0 +1,85 @@
+--- a/drivers/input/touchscreen/nt36523/nt36xxx.c
++++ b/drivers/input/touchscreen/nt36523/nt36xxx.c
+@@ -84,6 +84,8 @@
+ 
+ static void nvt_apply_android16_range(void)
+ {
++	if (ts->coords_12bit)
++		return;
+ 	if (ts->raw_x_max <= 2000 && ts->raw_y_max <= 3000) {
+ 		NVT_LOG("android16 coordinate range override %ux%u -> %ux%u\n",
+ 			ts->raw_x_max, ts->raw_y_max,
+@@ -768,6 +770,9 @@
+ 	if (of_property_read_u32(np, "touchscreen-size-y", &ts->raw_y_max))
+ 		ts->raw_y_max = TOUCH_DEFAULT_MAX_HEIGHT;
+ 	ts->swap_xy = of_property_read_bool(np, "touchscreen-swapped-x-y");
++	/* Older firmware (Lenovo J606) packs 12-bit coordinates in the screen's
++	 * own range instead of 16-bit ones. */
++	ts->coords_12bit = of_property_read_bool(np, "novatek,coords-12bit");
+ 	ts->invert_x = of_property_read_bool(np, "touchscreen-inverted-x");
+ 	ts->invert_y = of_property_read_bool(np, "touchscreen-inverted-y");
+ 	nvt_apply_android16_range();
+@@ -1042,10 +1047,17 @@
+ 			/* update interrupt timer */
+ 			irq_timer = jiffies;
+ #endif /* #if NVT_TOUCH_ESD_PROTECT */
+-			input_x = ((uint32_t)point_data[position + 1] << 8) |
+-				  point_data[position + 2];
+-			input_y = ((uint32_t)point_data[position + 3] << 8) |
+-				  point_data[position + 4];
++			if (ts->coords_12bit) {
++				input_x = ((uint32_t)point_data[position + 1] << 4) |
++					  (point_data[position + 3] >> 4);
++				input_y = ((uint32_t)point_data[position + 2] << 4) |
++					  (point_data[position + 3] & 0x0F);
++			} else {
++				input_x = ((uint32_t)point_data[position + 1] << 8) |
++					  point_data[position + 2];
++				input_y = ((uint32_t)point_data[position + 3] << 8) |
++					  point_data[position + 4];
++			}
+ 			if ((input_x >= ts->raw_x_max) || (input_y >= ts->raw_y_max))
+ 				continue;
+ 
+@@ -1202,8 +1214,16 @@
+ *******************************************************/
+ static int8_t nvt_ts_check_chip_ver_trim(uint32_t chip_ver_trim_addr)
+ {
++	static struct nvt_ts_mem_map mmap;
++	uint32_t event_buf;
+ 
+-	ts->mmap = &NT36523_memory_map;
++	/* NT36523W (Lenovo J606) keeps its event buffer at 0x2FE00, not at the
++	 * NT36523N address; the device tree may say so. */
++	mmap = NT36523_memory_map;
++	if (!of_property_read_u32(ts->client->dev.of_node,
++				  "novatek,event-buf-addr", &event_buf))
++		mmap.EVENT_BUF_ADDR = event_buf;
++	ts->mmap = &mmap;
+ 	ts->carrier_system = NT36523_hw_info.carrier_system;
+ 	ts->hw_crc = NT36523_hw_info.hw_crc;
+ 	return 0;
+@@ -1528,7 +1548,12 @@
+ 	} /* if (ts->pen_support) */
+ 
+ 	//---set int-pin & request irq---
+-	client->irq = gpiod_to_irq(ts->irq_gpiod);
++	/* Prefer the interrupt and its trigger from the device tree (the
++	 * J606L line is active-low level); fall back to the GPIO. */
++	if (client->irq > 0 && irq_get_trigger_type(client->irq))
++		ts->int_trigger_type = irq_get_trigger_type(client->irq);
++	else
++		client->irq = gpiod_to_irq(ts->irq_gpiod);
+ 	if (client->irq) {
+ 		NVT_LOG("int_trigger_type=%d\n", ts->int_trigger_type);
+ 		ts->irq_enabled = true;
+--- a/drivers/input/touchscreen/nt36523/nt36xxx.h
++++ b/drivers/input/touchscreen/nt36523/nt36xxx.h
+@@ -143,6 +143,7 @@
+ 	uint32_t raw_x_max;
+ 	uint32_t raw_y_max;
+ 	bool swap_xy;
++	bool coords_12bit;
+ 	bool invert_x;
+ 	bool invert_y;
+ 	uint8_t max_touch_num;

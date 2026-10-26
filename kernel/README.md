@@ -12,8 +12,9 @@ Source: [TeamYogaBlade2/linux](https://github.com/TeamYogaBlade2/linux)
    Kconfig and `obj-$(CONFIG_TOUCHSCREEN_NT36523_SPI) += nt36523/` to its
    Makefile, then apply `patches/0002-*.patch`. Patch 0001 comes from
    hashtagbasit/SteamOS-ARM-Port (author guf296, GPL) for the NT36523N of
-   the Lenovo TB321FU; 0002 adapts it to the J606L NT36523W (event buffer
-   at 0x2FE00, active-low level interrupt from the device tree).
+   the Lenovo TB321FU; 0002 adapts it to the J606L NT36523W through device tree properties:
+   the event buffer at 0x2FE00, 12-bit coordinates in the screen's range,
+   and the interrupt trigger from `interrupts`.
 3. Config: arm64 `defconfig` plus `haltia-j606l.config`.
 4. `make Image.gz modules qcom/sm6115-lenovo-j606l.dtb`, then
    `build-boot.sh <build dir> boot.img` and `fastboot flash recovery_b boot.img`.

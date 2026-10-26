@@ -31,27 +31,29 @@
 /* Touch: Novatek NT36523 (TDDI, no flash) on QUP SE2 SPI, chip select 1,
  * as in the stock overlay. The driver loads novatek_ts_fw.bin from the
  * stock vendor partition at every start. */
-&gpi_dma0 { status = "okay"; };
 &qupv3_id_0 { status = "okay"; };
 
 &spi2 {
+	/* GPI DMA transfers stalled the touch thread in spi_transfer_one_message;
+	 * without dmas the GENI controller uses FIFO and SE DMA. */
+	/delete-property/ dmas;
+	/delete-property/ dma-names;
 	status = "okay";
 
 	touchscreen@0 {
 		compatible = "novatek,NVT-ts-spi";
 		reg = <0>;
 		spi-max-frequency = <9600000>;
-		interrupts-extended = <&tlmm 86 IRQ_TYPE_LEVEL_LOW>;
+		interrupts-extended = <&tlmm 86 IRQ_TYPE_EDGE_RISING>;
 		reset-gpios = <&tlmm 54 GPIO_ACTIVE_HIGH>;
 		irq-gpios = <&tlmm 86 GPIO_ACTIVE_HIGH>;
 		firmware-name = "novatek_ts_fw.bin";
 		pinctrl-0 = <&ts_int_default>;
 		pinctrl-names = "default";
-		novatek,pen-support;
-		novatek,wgp-stylus;
 		novatek,swrst-n8-addr = <0x3f0fe>;
 		novatek,spi-rd-fast-addr = <0x3f310>;
 		novatek,event-buf-addr = <0x2fe00>;
+		novatek,coords-12bit;
 		touchscreen-size-x = <1200>;
 		touchscreen-size-y = <2000>;
 	};
