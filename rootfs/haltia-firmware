@@ -5,7 +5,7 @@
 # nothing once the files are there.
 fw=/lib/firmware
 soc=$fw/qcom/sm6115/LENOVO/J606L
-[ -e $fw/novatek_ts_fw.bin ] && [ -e $soc/modem.mdt ] && exit 0
+[ -e $fw/novatek_ts_fw.bin ] && [ -e $soc/modem.mdt ] && [ -e $soc/a610_zap.mdt ] && exit 0
 super=
 for u in /sys/class/block/*/uevent; do
 	grep -qx PARTNAME=super "$u" && super=/dev/$(sed -n 's/^DEVNAME=//p' "$u")
@@ -17,6 +17,10 @@ LP_SLOT=1 python3 /usr/sbin/haltia-lpdump "$super" vendor_b "$img" || exit 1
 mkdir -p $mnt $fw
 mount -o ro,loop "$img" $mnt || exit 1
 cp $mnt/firmware/novatek_ts_fw.bin $fw/
+# Adreno 610: the stock zap shader and the a630 SQE microcode.
+mkdir -p $soc $fw/qcom
+cp $mnt/firmware/a610_zap.* $soc/
+cp $mnt/firmware/a630_sqe.fw $fw/qcom/
 umount $mnt
 rm -f "$img"
 

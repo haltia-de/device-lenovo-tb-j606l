@@ -44,15 +44,14 @@
 	status = "okay";
 };
 
-/* First picture through simpledrm on the bootloader's framebuffer. The
- * MSM display path, the GPU and the remote processors need firmware and a
- * checked J606L panel; they come later. */
-&gpu { status = "disabled"; };
-&gpu_zap_shader { /delete-property/ firmware-name; status = "disabled"; };
-&mdss { status = "disabled"; };
-&mdss_dsi0 { status = "disabled"; };
-&mdss_dsi0_phy { status = "disabled"; };
-&panel { status = "disabled"; };
+/* Display through MSM DRM and the upstream J606F panel driver (the J606L
+ * has the same BOE NT36523W, as its stock command line names). simplefb
+ * shows the bootloader picture until msm takes over. The GPU loads the
+ * stock zap shader that haltia-firmware copies from vendor_b. */
+&gpu_zap_shader {
+	firmware-name = "qcom/sm6115/LENOVO/J606L/a610_zap.mdt";
+};
+
 &remoteproc_adsp { /delete-property/ firmware-name; status = "disabled"; };
 &remoteproc_cdsp { /delete-property/ firmware-name; status = "disabled"; };
 

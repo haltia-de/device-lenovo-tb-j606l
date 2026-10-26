@@ -61,7 +61,6 @@ EOF
 install -D -m 755 "$SRC/rootfs/haltia-firstboot" "$ROOT/sbin/haltia-firstboot"
 install -D -m 755 "$SRC/rootfs/haltia-init" "$ROOT/sbin/haltia-init"
 install -D -m 644 "$SRC/rootfs/phoc.ini" "$ROOT/etc/haltia/phoc.ini"
-install -D -m 644 "$SRC/rootfs/91-haltia-j606l-touch.rules" "$ROOT/etc/udev/rules.d/91-haltia-j606l-touch.rules"
 install -D -m 644 "$SRC/rootfs/networkmanager-usb0.conf" "$ROOT/etc/NetworkManager/conf.d/haltia-usb0.conf"
 install -D -m 644 "$SRC/rootfs/networkmanager-wifi-mac.conf" "$ROOT/etc/NetworkManager/conf.d/haltia-wifi-mac.conf"
 install -D -m 755 "$SRC/rootfs/haltia-fix-owners" "$ROOT/usr/sbin/haltia-fix-owners"
@@ -78,11 +77,7 @@ install -D -m 755 "$SRC/rootfs/bt-address.start" "$ROOT/etc/local.d/10-bt-addres
 install -D -m 755 "$SRC/rootfs/desktop.start" "$ROOT/etc/local.d/desktop.start"
 mkdir -p "$ROOT/etc/haltia"
 echo "$PACKAGES" | tr -s ' \t\n' '\n' | sed '/^$/d' > "$ROOT/etc/haltia/firstboot.packages"
-mkdir -p "$ROOT/var/lib/haltia" "$ROOT/etc/modprobe.d"
-# The picture is the bootloader's framebuffer through simpledrm. The display
-# clock controller has no consumer while MDSS is off, so once loaded it
-# powers the MDSS domain down and the screen goes dark.
-printf 'blacklist dispcc_sm6115\n' > "$ROOT/etc/modprobe.d/haltia-display.conf"
+mkdir -p "$ROOT/var/lib/haltia"
 # DEBUG=1 adds a passwordless USB root shell for development.
 if [ "${DEBUG:-0}" = 1 ]; then
 	touch "$ROOT/etc/haltia/debug-shell"
