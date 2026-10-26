@@ -6,15 +6,6 @@ export WLR_NO_HARDWARE_CURSORS=1 LIBSEAT_BACKEND=seatd
 export PHOC_DEBUG=fake-builtin
 export XDG_SESSION_TYPE=wayland XDG_CURRENT_DESKTOP=Haltia:GNOME
 export XDG_SESSION_DESKTOP=haltia LANG=ru_RU.UTF-8
-# The accelerometer comes from the ADSP sensor core a few seconds after
-# boot; haltia-rotate looks for it once, when the session starts.
-for i in $(seq 1 40); do
-	gdbus call --system --dest net.hadess.SensorProxy \
-		--object-path /net/hadess/SensorProxy \
-		--method org.freedesktop.DBus.Properties.Get net.hadess.SensorProxy HasAccelerometer \
-		2>/dev/null | grep -q true && break
-	sleep 0.5
-done
 mkdir -p "$XDG_RUNTIME_DIR"
 chmod 700 "$XDG_RUNTIME_DIR"
 # Linux stays the default system once the session has run for a minute.
