@@ -42,4 +42,8 @@ fi
 /usr/sbin/haltia-boot android
 
 [ -e /var/lib/haltia/firstboot-done ] || /sbin/haltia-firstboot
+
+# The clock may start behind the time OpenRC cached its service graph
+# (there is no settable RTC); a "skewed" cache makes it skip services.
+rm -f /lib/rc/cache/deptree /lib/rc/cache/depconfig
 exec /sbin/init

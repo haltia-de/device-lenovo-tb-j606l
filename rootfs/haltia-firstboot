@@ -63,7 +63,10 @@ depmod -a "$(uname -r)" 2>/dev/null
 for s in devfs dmesg sysfs udev udev-trigger udev-settle; do
 	rc-update add $s sysinit
 done
-for s in modules sysctl hostname bootmisc syslog; do
+# The PMIC RTC cannot be set: keep time across reboots from the shutdown
+# stamp (swclock) until ntpd has the network. Without it the clock starts
+# in 1970 and OpenRC skips services over the "skewed" dependency cache.
+for s in swclock modules sysctl hostname bootmisc syslog; do
 	rc-update add $s boot
 done
 for s in dbus elogind polkit seatd tqftpserv rmtfs networkmanager sshd ntpd iio-sensor-proxy earlyoom local; do

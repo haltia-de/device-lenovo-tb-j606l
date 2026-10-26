@@ -73,3 +73,17 @@
 		bias-pull-up;
 	};
 };
+
+/* Battery gauge on QUP SE0 I2C, as in the stock overlay. GENI I2C needs
+ * its GPI DMA channels to probe. */
+&gpi_dma0 { status = "okay"; };
+
+&i2c0 {
+	clock-frequency = <400000>;
+	status = "okay";
+
+	fuel-gauge@55 {
+		compatible = "mitsumi,mm8013";
+		reg = <0x55>;
+	};
+};
