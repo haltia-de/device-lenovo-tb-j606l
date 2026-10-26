@@ -1,0 +1,7 @@
+# The sensors come from the ADSP sensor PD and appear a few seconds after it
+# starts; iio-sensor-proxy ends when it finds none, so keep restarting it.
+# The session (local) starts after it, so haltia-rotate finds the sensor.
+rc_need="hexagonrpcd-adsp-sensorspd"
+rc_before="local"
+respawn_delay=3
+respawn_max=0

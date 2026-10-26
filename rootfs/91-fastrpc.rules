@@ -1,0 +1,2 @@
+# hexagonrpcd serves the ADSP as the fastrpc user.
+KERNEL=="fastrpc-*", GROUP="fastrpc", MODE="0660"

@@ -38,6 +38,10 @@ done < /lib/apk/db/triggers
 
 # Owners that did not exist when the packages were unpacked.
 python3 /usr/sbin/haltia-fix-owners
+# Only the ADSP sensor PD is served: starting the root PD server together
+# with it early in the boot crashed the SoC into its dump mode.
+# haltia-firmware ran before the fastrpc user existed.
+chown -R fastrpc:fastrpc /usr/share/qcom 2>/dev/null
 
 # rmtfs serves the modem read-only copies of its EFS partitions, so the
 # stock modemst1, modemst2, fsg and fsc are never written.
@@ -69,7 +73,7 @@ done
 for s in swclock modules sysctl hostname bootmisc syslog; do
 	rc-update add $s boot
 done
-for s in dbus elogind polkit seatd tqftpserv rmtfs networkmanager bluetooth sshd ntpd iio-sensor-proxy earlyoom local; do
+for s in dbus elogind polkit seatd tqftpserv rmtfs hexagonrpcd-adsp-sensorspd networkmanager bluetooth sshd ntpd iio-sensor-proxy earlyoom local; do
 	[ -e /etc/init.d/$s ] && rc-update add $s default
 done
 for s in mount-ro killprocs savecache; do

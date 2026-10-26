@@ -1,0 +1,7 @@
+// The accelerometer is reachable only through iio-sensor-proxy (it sits on
+// the ADSP sensor core); let the session user's haltia-rotate claim it.
+polkit.addRule(function(action, subject) {
+	if (action.id == "net.hadess.SensorProxy.claim-sensor" &&
+	    subject.isInGroup("wheel"))
+		return polkit.Result.YES;
+});

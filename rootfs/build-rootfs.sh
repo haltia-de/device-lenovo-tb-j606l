@@ -31,6 +31,7 @@ PACKAGES="alpine-base openrc busybox-openrc busybox-binsh eudev udev-init-script
 	adwaita-icon-theme gtk+3.0-lang desktop-file-utils tzdata xdg-utils
 	openssh openssh-server-pam doas earlyoom earlyoom-openrc
 	zstd qrtr rmtfs rmtfs-openrc tqftpserv tqftpserv-openrc linux-firmware-ath10k linux-firmware-qca bluez bluez-openrc bluez-btmgmt
+	hexagonrpcd hexagonrpcd-openrc libssc
 	bash htop nano e2fsprogs e2fsprogs-extra kmod util-linux python3
 	haltia-keys haltia-desktop haltia-music haltia-weather"
 
@@ -76,6 +77,14 @@ install -D -m 644 "$SRC/rootfs/elogind-sleep.conf" "$ROOT/etc/elogind/sleep.conf
 # Speakers: UCM for the "Lenovo-TB-J606L" card (driver sm4250).
 install -D -m 644 "$SRC/rootfs/ucm/Lenovo-TB-J606L.conf" "$ROOT/usr/share/alsa/ucm2/conf.d/sm4250/Lenovo-TB-J606L.conf"
 install -D -m 644 "$SRC/rootfs/ucm/HiFi.conf" "$ROOT/usr/share/alsa/ucm2/Lenovo/TB-J606L/HiFi.conf"
+install -D -m 644 "$SRC/rootfs/91-fastrpc.rules" "$ROOT/etc/udev/rules.d/91-fastrpc.rules"
+install -D -m 644 "$SRC/rootfs/81-j606l-sensors.rules" "$ROOT/etc/udev/rules.d/81-j606l-sensors.rules"
+for s in hexagonrpcd-adsp-rootpd hexagonrpcd-adsp-sensorspd; do
+	install -D -m 644 "$SRC/rootfs/hexagonrpcd.confd" "$ROOT/etc/conf.d/$s"
+done
+install -D -m 644 "$SRC/rootfs/iio-sensor-proxy.confd" "$ROOT/etc/conf.d/iio-sensor-proxy"
+install -D -m 644 "$SRC/rootfs/50-haltia-j606l-sensors.rules" "$ROOT/etc/polkit-1/rules.d/50-haltia-j606l-sensors.rules"
+install -D -m 644 "$SRC/rootfs/device.conf" "$ROOT/etc/haltia/device.conf"
 install -D -m 755 "$SRC/rootfs/bt-address.start" "$ROOT/etc/local.d/10-bt-address.start"
 install -D -m 755 "$SRC/rootfs/desktop.start" "$ROOT/etc/local.d/desktop.start"
 mkdir -p "$ROOT/etc/haltia"

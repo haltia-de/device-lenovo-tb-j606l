@@ -5,7 +5,8 @@
 # nothing once the files are there.
 fw=/lib/firmware
 soc=$fw/qcom/sm6115/LENOVO/J606L
-[ -e $fw/novatek_ts_fw.bin ] && [ -e $soc/modem.mdt ] && [ -e $soc/a610_zap.mdt ] && [ -e $fw/awinic/aw882xx_acf.bin ] && exit 0
+[ -e $fw/novatek_ts_fw.bin ] && [ -e $soc/modem.mdt ] && [ -e $soc/a610_zap.mdt ] && [ -e $fw/awinic/aw882xx_acf.bin ] && \
+	[ -e /usr/share/qcom/sm6115/Lenovo/J606L/sensors/sns_reg.conf ] && exit 0
 super=
 for u in /sys/class/block/*/uevent; do
 	grep -qx PARTNAME=super "$u" && super=/dev/$(sed -n 's/^DEVNAME=//p' "$u")
@@ -38,6 +39,39 @@ cp -a $mnt/image/. $soc/
 # Board data for board id 0xff; linux-firmware has no Lenovo_P11 entry.
 cp $mnt/image/bdwlan.bin $fw/ath10k/WCN3990/hw1.0/board.bin
 umount $mnt
+# ADSP sensors (hexagonrpcd): the DSP libraries from dsp_b, the sensor
+# configs from vendor_b and the sensor registry from persist. persist is
+# mounted read-only without journal replay: it is never written.
+q=/usr/share/qcom/sm6115/Lenovo/J606L
+if [ ! -e $q/sensors/sns_reg.conf ]; then
+	mkdir -p $q/dsp $q/sensors/config $q/socinfo
+	part() {
+		for u in /sys/class/block/*/uevent; do
+			grep -qx "PARTNAME=$1" "$u" && echo "/dev/$(sed -n 's/^DEVNAME=//p' "$u")"
+		done
+	}
+	mount -o ro "$(part dsp_b)" $mnt && cp -a $mnt/. $q/dsp/ && umount $mnt
+	LP_SLOT=1 python3 /usr/sbin/haltia-lpdump "$super" vendor_b "$img" &&
+		mount -o ro,loop "$img" $mnt && {
+			cp $mnt/etc/sensors/config/*.json $q/sensors/config/
+			cp $mnt/etc/sensors/sns_reg_config $q/sensors/sns_reg.conf
+			umount $mnt
+		}
+	rm -f "$img"
+	mount -t ext4 -o ro,noload "$(part persist)" $mnt && {
+		cp -a $mnt/sensors/registry $q/sensors/
+		umount $mnt
+	}
+	# The registry picks its configs by the board, as Android's
+	# /sys/devices/soc0 tells it: an IDP board (34), SoC 444.
+	echo IDP > $q/socinfo/hw_platform
+	echo Unknown > $q/socinfo/platform_subtype
+	echo 0 > $q/socinfo/platform_subtype_id
+	echo 65536 > $q/socinfo/platform_version
+	echo 444 > $q/socinfo/soc_id
+	echo 1.0 > $q/socinfo/revision
+	chown -R fastrpc:fastrpc $q
+fi
 # linux-firmware ships firmware-5.bin compressed; give the kernel a plain one.
 z=$fw/ath10k/WCN3990/hw1.0/firmware-5.bin.zst
 [ -e "$z" ] && zstd -qdf "$z" -o "${z%.zst}"
