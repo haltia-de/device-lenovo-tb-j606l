@@ -59,6 +59,9 @@ EOF
 
 install -D -m 755 "$SRC/rootfs/haltia-firstboot" "$ROOT/sbin/haltia-firstboot"
 install -D -m 755 "$SRC/rootfs/haltia-init" "$ROOT/sbin/haltia-init"
+install -D -m 644 "$SRC/rootfs/phoc.ini" "$ROOT/etc/haltia/phoc.ini"
+install -D -m 644 "$SRC/rootfs/91-haltia-j606l-touch.rules" "$ROOT/etc/udev/rules.d/91-haltia-j606l-touch.rules"
+install -D -m 644 "$SRC/rootfs/networkmanager-usb0.conf" "$ROOT/etc/NetworkManager/conf.d/haltia-usb0.conf"
 install -D -m 755 "$SRC/rootfs/haltia-firmware" "$ROOT/usr/sbin/haltia-firmware"
 install -D -m 755 "$SRC/rootfs/haltia-lpdump" "$ROOT/usr/sbin/haltia-lpdump"
 install -D -m 755 "$SRC/rootfs/haltia-boot" "$ROOT/usr/sbin/haltia-boot"

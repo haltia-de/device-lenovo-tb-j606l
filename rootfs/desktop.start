@@ -14,7 +14,7 @@ chmod 700 "$XDG_RUNTIME_DIR"
 while :; do
 	u=$(cat /etc/haltia/session-user 2>/dev/null)
 	id "$u" >/dev/null 2>&1 || u=root
-	/usr/bin/haltia-session -u "$u" dbus-run-session -- phoc -C /usr/share/haltia/phoc.ini -E /usr/bin/haltia-launcher >>/var/log/session.log 2>&1
+	/usr/bin/haltia-session -u "$u" dbus-run-session -- phoc -C /etc/haltia/phoc.ini -E /usr/bin/haltia-launcher >>/var/log/session.log 2>&1
 	killall pipewire pipewire-pulse wireplumber 2>/dev/null
 	sleep 2
 done ) >/dev/null 2>&1 &

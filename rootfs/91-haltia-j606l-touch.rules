@@ -1,0 +1,2 @@
+# The picture is landscape (phoc rotate = 90): turn the touch with it.
+ACTION=="add|change", KERNEL=="event*", ATTRS{name}=="NVTCapacitiveTouchScreen", ENV{LIBINPUT_CALIBRATION_MATRIX}="0 1 0 -1 0 1"
