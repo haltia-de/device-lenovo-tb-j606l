@@ -29,6 +29,11 @@ packs the modules as `<work>/modules.tar` for `rootfs/build-rootfs.sh`
 - `0004` makes `dwc3-qcom-legacy` set the UTMI pipe clock and the VBUS
   override again on resume; without it USB is gone after s2idle.
 - `0005` hooks the touch driver into the touchscreen Kconfig and Makefile.
+- `0006` driver for the four AW88258 speaker amplifiers (written for this
+  port from Awinic's GPL aw882xx driver in Lenovo's sources). It loads each
+  amplifier's register profile from the stock `awinic/aw882xx_acf.bin` and
+  turns the profile's four-slot TDM frame into the two-slot I2S frame the
+  LPASS primary MI2S port sends.
 
 The touch firmware (`novatek_ts_fw.bin`) and the modem images are Lenovo's
 and stay out of the repository: `rootfs/haltia-firmware` copies them from

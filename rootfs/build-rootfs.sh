@@ -25,7 +25,7 @@ PACKAGES="alpine-base openrc busybox-openrc busybox-binsh eudev udev-init-script
 	upower networkmanager networkmanager-openrc networkmanager-wifi networkmanager-cli
 	wpa_supplicant iw wireless-regdb
 	iio-sensor-proxy iio-sensor-proxy-openrc feedbackd feedbackd-device-themes
-	pipewire wireplumber pipewire-pulse pulseaudio-utils alsa-utils alsa-ucm-conf
+	pulseaudio pulseaudio-alsa pulseaudio-utils alsa-plugins-pulse alsa-utils alsa-ucm-conf
 	firefox mobile-config-firefox foot grim fuzzel gtk-layer-shell mako
 	py3-gobject3 py3-pillow py3-cairo font-noto font-noto-emoji font-dejavu
 	adwaita-icon-theme gtk+3.0-lang desktop-file-utils tzdata xdg-utils
@@ -73,6 +73,9 @@ install -D -m 755 "$SRC/rootfs/haltia-reboot-android" "$ROOT/usr/sbin/haltia-reb
 install -D -m 644 "$SRC/rootfs/android.desktop" "$ROOT/usr/share/applications/haltia-android.desktop"
 install -D -m 644 "$SRC/rootfs/elogind-lid.conf" "$ROOT/etc/elogind/logind.conf.d/haltia-j606l.conf"
 install -D -m 644 "$SRC/rootfs/elogind-sleep.conf" "$ROOT/etc/elogind/sleep.conf.d/haltia-j606l.conf"
+# Speakers: UCM for the "Lenovo-TB-J606L" card (driver sm4250).
+install -D -m 644 "$SRC/rootfs/ucm/Lenovo-TB-J606L.conf" "$ROOT/usr/share/alsa/ucm2/conf.d/sm4250/Lenovo-TB-J606L.conf"
+install -D -m 644 "$SRC/rootfs/ucm/HiFi.conf" "$ROOT/usr/share/alsa/ucm2/Lenovo/TB-J606L/HiFi.conf"
 install -D -m 755 "$SRC/rootfs/bt-address.start" "$ROOT/etc/local.d/10-bt-address.start"
 install -D -m 755 "$SRC/rootfs/desktop.start" "$ROOT/etc/local.d/desktop.start"
 mkdir -p "$ROOT/etc/haltia"

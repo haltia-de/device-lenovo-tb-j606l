@@ -5,7 +5,7 @@
 # nothing once the files are there.
 fw=/lib/firmware
 soc=$fw/qcom/sm6115/LENOVO/J606L
-[ -e $fw/novatek_ts_fw.bin ] && [ -e $soc/modem.mdt ] && [ -e $soc/a610_zap.mdt ] && exit 0
+[ -e $fw/novatek_ts_fw.bin ] && [ -e $soc/modem.mdt ] && [ -e $soc/a610_zap.mdt ] && [ -e $fw/awinic/aw882xx_acf.bin ] && exit 0
 super=
 for u in /sys/class/block/*/uevent; do
 	grep -qx PARTNAME=super "$u" && super=/dev/$(sed -n 's/^DEVNAME=//p' "$u")
@@ -21,6 +21,9 @@ cp $mnt/firmware/novatek_ts_fw.bin $fw/
 mkdir -p $soc $fw/qcom
 cp $mnt/firmware/a610_zap.* $soc/
 cp $mnt/firmware/a630_sqe.fw $fw/qcom/
+# Register profiles of the four AW88258 speaker amplifiers.
+mkdir -p $fw/awinic
+cp $mnt/firmware/awinic/aw882xx_acf.bin $fw/awinic/
 umount $mnt
 rm -f "$img"
 
