@@ -69,7 +69,7 @@ done
 for s in swclock modules sysctl hostname bootmisc syslog; do
 	rc-update add $s boot
 done
-for s in dbus elogind polkit seatd tqftpserv rmtfs networkmanager sshd ntpd iio-sensor-proxy earlyoom local; do
+for s in dbus elogind polkit seatd tqftpserv rmtfs networkmanager bluetooth sshd ntpd iio-sensor-proxy earlyoom local; do
 	[ -e /etc/init.d/$s ] && rc-update add $s default
 done
 for s in mount-ro killprocs savecache; do

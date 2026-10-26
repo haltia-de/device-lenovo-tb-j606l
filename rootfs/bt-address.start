@@ -1,0 +1,16 @@
+#!/bin/sh
+# The WCN3990 Bluetooth controller comes up without a public address and
+# BlueZ leaves it unconfigured. Give it a stable, locally administered one
+# derived from the tablet's serial number.
+(
+	for i in $(seq 1 30); do
+		[ -e /sys/class/bluetooth/hci0 ] && break
+		sleep 1
+	done
+	serial=$(sed -n 's/.*androidboot.serialno=\([^ ]*\).*/\1/p' /proc/cmdline)
+	[ -n "$serial" ] || exit 0
+	h=$(printf 'haltia-bt-%s' "$serial" | sha256sum | cut -c1-12)
+	b0=$(printf '%02x' $(( (0x${h%??????????} & 0xfc) | 0x02 )))
+	addr=$(echo "$b0${h#??}" | sed 's/../&:/g; s/:$//')
+	btmgmt -i hci0 public-addr "$addr" >/dev/null 2>&1
+) &

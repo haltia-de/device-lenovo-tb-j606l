@@ -30,7 +30,7 @@ PACKAGES="alpine-base openrc busybox-openrc busybox-binsh eudev udev-init-script
 	py3-gobject3 py3-pillow py3-cairo font-noto font-noto-emoji font-dejavu
 	adwaita-icon-theme gtk+3.0-lang desktop-file-utils tzdata xdg-utils
 	openssh openssh-server-pam doas earlyoom earlyoom-openrc
-	zstd qrtr rmtfs rmtfs-openrc tqftpserv tqftpserv-openrc linux-firmware-ath10k
+	zstd qrtr rmtfs rmtfs-openrc tqftpserv tqftpserv-openrc linux-firmware-ath10k linux-firmware-qca bluez bluez-openrc bluez-btmgmt
 	bash htop nano e2fsprogs e2fsprogs-extra kmod util-linux python3
 	haltia-keys haltia-desktop haltia-music haltia-weather"
 
@@ -72,6 +72,7 @@ install -D -m 755 "$SRC/rootfs/haltia-lpdump" "$ROOT/usr/sbin/haltia-lpdump"
 install -D -m 755 "$SRC/rootfs/haltia-boot" "$ROOT/usr/sbin/haltia-boot"
 install -D -m 755 "$SRC/rootfs/haltia-reboot-android" "$ROOT/usr/sbin/haltia-reboot-android"
 install -D -m 644 "$SRC/rootfs/android.desktop" "$ROOT/usr/share/applications/haltia-android.desktop"
+install -D -m 755 "$SRC/rootfs/bt-address.start" "$ROOT/etc/local.d/10-bt-address.start"
 install -D -m 755 "$SRC/rootfs/desktop.start" "$ROOT/etc/local.d/desktop.start"
 mkdir -p "$ROOT/etc/haltia"
 echo "$PACKAGES" | tr -s ' \t\n' '\n' | sed '/^$/d' > "$ROOT/etc/haltia/firstboot.packages"
