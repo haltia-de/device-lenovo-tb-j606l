@@ -87,3 +87,15 @@
 		reg = <0x55>;
 	};
 };
+
+/* Backlight: SGM37604A on QUP SE1 I2C; PMI632 GPIO 6 enables it (the
+ * bootloader leaves it on). */
+&i2c1 {
+	clock-frequency = <400000>;
+	status = "okay";
+
+	backlight@36 {
+		compatible = "sgmicro,sgm37604a";
+		reg = <0x36>;
+	};
+};
