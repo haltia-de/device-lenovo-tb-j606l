@@ -1,8 +1,8 @@
 #!/bin/sh
-# The Haltia session on the TB-J606L. phoc renders with pixman on the
-# DRM device (simpledrm until the MSM display driver takes over).
+# The Haltia session on the TB-J606L. phoc renders with GLES2 on the
+# Adreno 610 (freedreno) through the MSM display driver.
 export HOME=/root XDG_RUNTIME_DIR=/run/user/0
-export WLR_RENDERER=pixman WLR_NO_HARDWARE_CURSORS=1 LIBSEAT_BACKEND=seatd
+export WLR_NO_HARDWARE_CURSORS=1 LIBSEAT_BACKEND=seatd
 export PHOC_DEBUG=fake-builtin
 export XDG_SESSION_TYPE=wayland XDG_CURRENT_DESKTOP=Haltia:GNOME
 export XDG_SESSION_DESKTOP=haltia LANG=ru_RU.UTF-8
