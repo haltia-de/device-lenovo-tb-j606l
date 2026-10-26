@@ -29,3 +29,6 @@ cp $mnt/image/modem.* $mnt/image/wlanmdsp.mbn $mnt/image/adsp.* $mnt/image/cdsp.
 # Board data for board id 0xff; linux-firmware has no Lenovo_P11 entry.
 cp $mnt/image/bdwlan.bin $fw/ath10k/WCN3990/hw1.0/board.bin
 umount $mnt
+# linux-firmware ships firmware-5.bin compressed; give the kernel a plain one.
+z=$fw/ath10k/WCN3990/hw1.0/firmware-5.bin.zst
+[ -e "$z" ] && zstd -qdf "$z" -o "${z%.zst}"
