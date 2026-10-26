@@ -27,3 +27,42 @@
 &remoteproc_cdsp { /delete-property/ firmware-name; status = "disabled"; };
 &remoteproc_mpss { /delete-property/ firmware-name; status = "disabled"; };
 &wifi { status = "disabled"; };
+
+/* Touch: Novatek NT36523 (TDDI, no flash) on QUP SE2 SPI, chip select 1,
+ * as in the stock overlay. The driver loads novatek_ts_fw.bin from the
+ * stock vendor partition at every start. */
+&gpi_dma0 { status = "okay"; };
+&qupv3_id_0 { status = "okay"; };
+
+&spi2 {
+	status = "okay";
+
+	touchscreen@0 {
+		compatible = "novatek,NVT-ts-spi";
+		reg = <0>;
+		spi-max-frequency = <9600000>;
+		interrupts-extended = <&tlmm 86 IRQ_TYPE_LEVEL_LOW>;
+		reset-gpios = <&tlmm 54 GPIO_ACTIVE_HIGH>;
+		irq-gpios = <&tlmm 86 GPIO_ACTIVE_HIGH>;
+		firmware-name = "novatek_ts_fw.bin";
+		pinctrl-0 = <&ts_int_default>;
+		pinctrl-names = "default";
+		novatek,pen-support;
+		novatek,wgp-stylus;
+		novatek,swrst-n8-addr = <0x3f0fe>;
+		novatek,spi-rd-fast-addr = <0x3f310>;
+		novatek,event-buf-addr = <0x2fe00>;
+		touchscreen-size-x = <1200>;
+		touchscreen-size-y = <2000>;
+	};
+};
+
+&tlmm {
+	/* The stock "pmx_ts_int_active": the interrupt line needs a pull-up. */
+	ts_int_default: ts-int-default-state {
+		pins = "gpio86";
+		function = "gpio";
+		drive-strength = <8>;
+		bias-pull-up;
+	};
+};

@@ -1,0 +1,20 @@
+#!/bin/sh
+# Copy the device's own firmware out of the stock Android vendor partition
+# (vendor_b inside super) into /lib/firmware. Lenovo's files are not part of
+# the image. Runs at every boot before udev loads the drivers; it does
+# nothing once the files are there.
+fw=/lib/firmware
+[ -e $fw/novatek_ts_fw.bin ] && exit 0
+super=
+for u in /sys/class/block/*/uevent; do
+	grep -qx PARTNAME=super "$u" && super=/dev/$(sed -n 's/^DEVNAME=//p' "$u")
+done
+[ -b "$super" ] || exit 1
+img=/run/haltia-vendor.img
+mnt=/run/haltia-vendor
+LP_SLOT=1 python3 /usr/sbin/haltia-lpdump "$super" vendor_b "$img" || exit 1
+mkdir -p $mnt $fw
+mount -o ro,loop "$img" $mnt || exit 1
+cp $mnt/firmware/novatek_ts_fw.bin $fw/
+umount $mnt
+rm -f "$img"

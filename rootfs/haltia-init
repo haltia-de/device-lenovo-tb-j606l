@@ -35,6 +35,9 @@ if [ -e /etc/haltia/debug-shell ]; then
 	setsid sh -c 'while :; do [ -c /dev/ttyGS0 ] && sh -i </dev/ttyGS0 >/dev/ttyGS0 2>&1; sleep 1; done' &
 fi
 
+# Firmware from the stock vendor partition, before udev loads drivers.
+/usr/sbin/haltia-firmware
+
 # Boot into Android next time unless this boot reaches the desktop
 # (desktop.start arms Linux again).
 /usr/sbin/haltia-boot android

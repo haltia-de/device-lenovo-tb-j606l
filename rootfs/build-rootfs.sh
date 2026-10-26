@@ -59,6 +59,8 @@ EOF
 
 install -D -m 755 "$SRC/rootfs/haltia-firstboot" "$ROOT/sbin/haltia-firstboot"
 install -D -m 755 "$SRC/rootfs/haltia-init" "$ROOT/sbin/haltia-init"
+install -D -m 755 "$SRC/rootfs/haltia-firmware" "$ROOT/usr/sbin/haltia-firmware"
+install -D -m 755 "$SRC/rootfs/haltia-lpdump" "$ROOT/usr/sbin/haltia-lpdump"
 install -D -m 755 "$SRC/rootfs/haltia-boot" "$ROOT/usr/sbin/haltia-boot"
 install -D -m 755 "$SRC/rootfs/haltia-reboot-android" "$ROOT/usr/sbin/haltia-reboot-android"
 install -D -m 644 "$SRC/rootfs/android.desktop" "$ROOT/usr/share/applications/haltia-android.desktop"

@@ -1,0 +1,37 @@
+#!/usr/bin/env python3
+"""Print or extract logical partitions of an Android super partition."""
+import struct, sys
+dev = sys.argv[1]
+f = open(dev, 'rb')
+f.seek(4096); geo = f.read(4096)
+assert geo[:4] == b'\x67\x44\x6c\x61', 'no LP geometry'
+max_meta = struct.unpack_from('<I', geo, 40)[0]
+slot = int(__import__("os").environ.get("LP_SLOT", "1"))
+f.seek(4096 * 3 + slot * max_meta); hdr = f.read(max_meta)  # primary metadata, per slot
+assert hdr[:4] == b'\x30\x50\x4c\x41', 'no LP header'
+hsize = struct.unpack_from('<I', hdr, 8)[0]
+def table(off):
+    return struct.unpack_from('<III', hdr, off)
+tables = hdr[hsize:]
+po, pn, ps = table(80); eo, en, es = table(92)
+parts = {}
+for i in range(pn):
+    p = tables[po + i * ps: po + (i + 1) * ps]
+    name = p[:36].rstrip(b'\0').decode(); first, num = struct.unpack_from('<II', p, 40)
+    exts = []
+    for j in range(first, first + num):
+        e = tables[eo + j * es: eo + (j + 1) * es]
+        sectors, ttype, target, _ = struct.unpack_from('<QIQI', e)
+        exts.append((sectors, ttype, target))
+    parts[name] = exts
+if len(sys.argv) == 2:
+    for n, e in parts.items():
+        print(n, sum(x[0] for x in e) * 512 // 2**20, 'MiB', e)
+else:
+    name, out = sys.argv[2], sys.argv[3]
+    with open(out, 'wb') as o:
+        for sectors, ttype, target in parts[name]:
+            assert ttype == 0
+            f.seek(target * 512); left = sectors * 512
+            while left:
+                b = f.read(min(left, 1 << 22)); o.write(b); left -= len(b)
