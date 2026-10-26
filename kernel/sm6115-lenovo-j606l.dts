@@ -1,0 +1,29 @@
+// SPDX-License-Identifier: BSD-3-Clause
+/* Lenovo Tab P11 TB-J606L (LTE). Derived from the upstream J606F tree. */
+#include "sm6115p-lenovo-j606f.dts"
+
+/ {
+	model = "Lenovo Tab P11 TB-J606L";
+	compatible = "lenovo,j606l", "qcom,sm6115p", "qcom,sm6115";
+	/* Measured on the lab unit: SoC 444, platform 0x10000; board 34/3. */
+	qcom,msm-id = <444 0x10000>;
+	qcom,board-id = <34 3>;
+};
+
+/* Only the HS PHY is wired. Without UTMI as the pipe clock the core comes
+ * up only after a fastboot session left it clocked (26 October 2026). */
+&usb { qcom,select-utmi-as-pipe-clk; };
+
+/* First picture through simpledrm on the bootloader's framebuffer. The
+ * MSM display path, the GPU and the remote processors need firmware and a
+ * checked J606L panel; they come later. */
+&gpu { status = "disabled"; };
+&gpu_zap_shader { /delete-property/ firmware-name; status = "disabled"; };
+&mdss { status = "disabled"; };
+&mdss_dsi0 { status = "disabled"; };
+&mdss_dsi0_phy { status = "disabled"; };
+&panel { status = "disabled"; };
+&remoteproc_adsp { /delete-property/ firmware-name; status = "disabled"; };
+&remoteproc_cdsp { /delete-property/ firmware-name; status = "disabled"; };
+&remoteproc_mpss { /delete-property/ firmware-name; status = "disabled"; };
+&wifi { status = "disabled"; };

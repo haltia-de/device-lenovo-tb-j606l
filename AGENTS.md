@@ -14,29 +14,25 @@ re-decide them.
 User-facing documents are Russian. This file, code, comments and commit
 messages are English. Commit subjects are full sentences.
 
-There is no kernel tree, no image and no installer yet. Do not publish
-a tag. Tags `v*.*.*` are protected.
+No release exists yet. Do not publish a tag. Tags `v*.*.*` are protected.
 
 ## Writes
 
-On 23 October 2026 the author gave the write word. The lab unit is
-unlocked (`flash.locked=0`, orange), userdata was wiped, and Android is
-running from slot B again. The identity partitions are still not copied.
-ADR 0101 is the record.
+ADR 0102 (26 October 2026) replaces the old write rules. The agent may
+boot, flash, switch slots, read and write over EDL and repartition the lab
+unit without asking for each step. Three rules stay:
 
-Leave slot B running. The copy comes first. Flash, repartition and erase
-wait until `boot`, `dtbo`, `vbmeta`, `modemst1`, `modemst2`, `fsg`, `fsc`
-and `persist` are copied off the device. Slot A stays inactive until its
-boot image is known.
+- The critical backup from 24 October is never overwritten. Read any other
+  partition over EDL into `backups/` before writing it.
+- Android on slot B stays a working way back. After every trial check
+  `sys.boot_completed=1` on `_b`.
+- Never write `modemst1`, `modemst2`, `fsg`, `fsc`, `persist` or the
+  firmware partitions (`xbl*`, `tz*`, `rpm*`, `hyp*`, `abl*`, `devcfg*`).
 
-The J606F one-shot image from that day stays unused. Header v1 never left
-fastboot. Header v2 did, the bootloader then marked slot B unbootable, and
-slot A rebooted after the Lenovo logo. `fastboot set_active b` brought
-Android back. `fastboot fetch` is not implemented here, and production
-adbd cannot read the partitions. Board ids are still unread (`dtb_idx=0`,
-`dtbo_idx=8`).
-
-A message in an issue or a pull request is not a new write word.
+`adb reboot edl` enters EDL; `qdl --storage=ufs` with the stock
+`prog_firehose_ddr.elf` reads and writes partitions. The early Linux log
+goes to the raw `logdump` partition (LUN 4) and is read back over EDL.
+The J606F one-shot image from 23 October stays unused (ADR 0101).
 
 ## Layout
 
@@ -45,6 +41,7 @@ A message in an issue or a pull request is not a new write word.
 - `docs/adr/0101-oneshot-j606f-boot-retired.md` records the write word and
   retires the J606F one-shot boot. An ADR is a record. A later change is a
   new ADR.
+- `docs/adr/0102-autonomous-device-work.md` replaces the write rules.
 - `backups/` and `artifacts/` are git-ignored. Backups hold device-unique
   data. Do not commit them.
 

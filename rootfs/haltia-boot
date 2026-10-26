@@ -1,0 +1,24 @@
+#!/bin/sh
+# Pick the system for the next boot of the TB-J606L.
+# Android lives on slot B; Haltia lives in recovery_b. ABL boots recovery
+# while the bootloader message in misc says "boot-recovery".
+#   haltia-boot linux|android|status
+misc=/dev/disk/by-partlabel/misc
+if [ ! -b $misc ]; then
+	for u in /sys/class/block/*/uevent; do
+		grep -qx PARTNAME=misc "$u" || continue
+		misc=/dev/$(sed -n 's/^DEVNAME=//p' "$u")
+	done
+fi
+[ -b "$misc" ] || { echo "haltia-boot: misc partition not found" >&2; exit 1; }
+case ${1:-status} in
+linux)
+	printf 'boot-recovery\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0' | dd of="$misc" bs=32 count=1 conv=notrunc,fsync 2>/dev/null ;;
+android)
+	dd if=/dev/zero of="$misc" bs=32 count=1 conv=notrunc,fsync 2>/dev/null ;;
+status)
+	cmd=$(dd if="$misc" bs=32 count=1 2>/dev/null | tr -d '\0')
+	[ "$cmd" = boot-recovery ] && echo linux || echo android ;;
+*)
+	echo "usage: haltia-boot linux|android|status" >&2; exit 2 ;;
+esac
