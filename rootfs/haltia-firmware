@@ -44,7 +44,9 @@ umount $mnt
 # mounted read-only without journal replay: it is never written.
 q=/usr/share/qcom/sm6115/Lenovo/J606L
 if [ ! -e $q/sensors/sns_reg.conf ]; then
-	mkdir -p $q/dsp $q/sensors/config $q/socinfo
+	# Root owns the tree; only the registry output below is the DSP's.
+	rm -rf $q
+	install -d -m 755 $q $q/dsp $q/sensors $q/sensors/config $q/socinfo
 	part() {
 		for u in /sys/class/block/*/uevent; do
 			grep -qx "PARTNAME=$1" "$u" && echo "/dev/$(sed -n 's/^DEVNAME=//p' "$u")"
@@ -70,7 +72,10 @@ if [ ! -e $q/sensors/sns_reg.conf ]; then
 	echo 65536 > $q/socinfo/platform_version
 	echo 444 > $q/socinfo/soc_id
 	echo 1.0 > $q/socinfo/revision
-	chown -R fastrpc:fastrpc $q
+	chown -R -h root:root $q
+	chmod -R u=rwX,go=rX $q
+	# The sensor registry writes its state here (sns_reg.conf "output").
+	chown -R -h fastrpc:fastrpc $q/sensors/registry/registry 2>/dev/null
 fi
 # linux-firmware ships firmware-5.bin compressed; give the kernel a plain one.
 z=$fw/ath10k/WCN3990/hw1.0/firmware-5.bin.zst

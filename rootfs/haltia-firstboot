@@ -40,8 +40,9 @@ done < /lib/apk/db/triggers
 python3 /usr/sbin/haltia-fix-owners
 # Only the ADSP sensor PD is served: starting the root PD server together
 # with it early in the boot crashed the SoC into its dump mode.
-# haltia-firmware ran before the fastrpc user existed.
-chown -R fastrpc:fastrpc /usr/share/qcom 2>/dev/null
+# haltia-firmware ran before the fastrpc user existed: hand the registry
+# output (only that) to it now.
+chown -R -h fastrpc:fastrpc /usr/share/qcom/sm6115/Lenovo/J606L/sensors/registry/registry 2>/dev/null
 
 # rmtfs serves the modem read-only copies of its EFS partitions, so the
 # stock modemst1, modemst2, fsg and fsc are never written.
