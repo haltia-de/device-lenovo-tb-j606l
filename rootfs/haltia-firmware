@@ -4,7 +4,8 @@
 # the image. Runs at every boot before udev loads the drivers; it does
 # nothing once the files are there.
 fw=/lib/firmware
-[ -e $fw/novatek_ts_fw.bin ] && exit 0
+soc=$fw/qcom/sm6115/LENOVO/J606L
+[ -e $fw/novatek_ts_fw.bin ] && [ -e $soc/modem.mdt ] && exit 0
 super=
 for u in /sys/class/block/*/uevent; do
 	grep -qx PARTNAME=super "$u" && super=/dev/$(sed -n 's/^DEVNAME=//p' "$u")
@@ -18,3 +19,13 @@ mount -o ro,loop "$img" $mnt || exit 1
 cp $mnt/firmware/novatek_ts_fw.bin $fw/
 umount $mnt
 rm -f "$img"
+
+# The modem (it runs the WLAN firmware) and the DSPs, from modem_b.
+mkdir -p $soc $fw/ath10k/WCN3990/hw1.0
+for u in /sys/class/block/*/uevent; do
+	grep -qx PARTNAME=modem_b "$u" && mount -o ro "/dev/$(sed -n 's/^DEVNAME=//p' "$u")" $mnt
+done
+cp $mnt/image/modem.* $mnt/image/wlanmdsp.mbn $mnt/image/adsp.* $mnt/image/cdsp.* $soc/
+# Board data for board id 0xff; linux-firmware has no Lenovo_P11 entry.
+cp $mnt/image/bdwlan.bin $fw/ath10k/WCN3990/hw1.0/board.bin
+umount $mnt

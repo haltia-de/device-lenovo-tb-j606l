@@ -36,6 +36,19 @@ while read -r q dirs; do
 	done
 done < /lib/apk/db/triggers
 
+# Owners that did not exist when the packages were unpacked.
+python3 /usr/sbin/haltia-fix-owners
+
+# rmtfs serves the modem read-only copies of its EFS partitions, so the
+# stock modemst1, modemst2, fsg and fsc are never written.
+mkdir -p /var/lib/rmtfs
+for p in modemst1:modem_fs1 modemst2:modem_fs2 fsg:modem_fsg fsc:modem_fsc; do
+	for u in /sys/class/block/*/uevent; do
+		grep -qx "PARTNAME=${p%%:*}" "$u" &&
+			dd if="/dev/$(sed -n 's/^DEVNAME=//p' "$u")" of="/var/lib/rmtfs/${p#*:}" bs=64k
+	done
+done
+
 # The image is smaller than the partition: grow the root to fill it.
 for u in /sys/class/block/*/uevent; do
 	grep -qx PARTNAME=haltia "$u" && resize2fs "/dev/$(sed -n 's/^DEVNAME=//p' "$u")"
@@ -53,7 +66,7 @@ done
 for s in modules sysctl hostname bootmisc syslog; do
 	rc-update add $s boot
 done
-for s in dbus elogind polkit seatd networkmanager sshd iio-sensor-proxy earlyoom local; do
+for s in dbus elogind polkit seatd tqftpserv rmtfs networkmanager sshd ntpd iio-sensor-proxy earlyoom local; do
 	[ -e /etc/init.d/$s ] && rc-update add $s default
 done
 for s in mount-ro killprocs savecache; do

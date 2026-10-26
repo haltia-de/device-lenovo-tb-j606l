@@ -14,6 +14,13 @@
  * up only after a fastboot session left it clocked (26 October 2026). */
 &usb { qcom,select-utmi-as-pipe-clk; };
 
+/* The modem runs the WLAN firmware. haltia-firmware copies the stock split
+ * images from modem_b; rmtfs serves copies of the EFS partitions read-only. */
+&remoteproc_mpss {
+	firmware-name = "qcom/sm6115/LENOVO/J606L/modem.mdt";
+	status = "okay";
+};
+
 /* First picture through simpledrm on the bootloader's framebuffer. The
  * MSM display path, the GPU and the remote processors need firmware and a
  * checked J606L panel; they come later. */
@@ -25,8 +32,6 @@
 &panel { status = "disabled"; };
 &remoteproc_adsp { /delete-property/ firmware-name; status = "disabled"; };
 &remoteproc_cdsp { /delete-property/ firmware-name; status = "disabled"; };
-&remoteproc_mpss { /delete-property/ firmware-name; status = "disabled"; };
-&wifi { status = "disabled"; };
 
 /* Touch: Novatek NT36523 (TDDI, no flash) on QUP SE2 SPI, chip select 1,
  * as in the stock overlay. The driver loads novatek_ts_fw.bin from the

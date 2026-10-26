@@ -1,0 +1,6 @@
+# Read-only copies of the EFS partitions (haltia-firstboot makes them).
+rmtfs_files_path="/var/lib/rmtfs"
+rmtfs_avoid_writing="true"
+# The modem asks tqftpserv for its files while it boots; without it the
+# modem watchdog fires once.
+rc_after="tqftpserv"
