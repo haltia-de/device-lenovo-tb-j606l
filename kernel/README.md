@@ -24,8 +24,11 @@ Source: [TeamYogaBlade2/linux](https://github.com/TeamYogaBlade2/linux)
    	tristate "SG Micro SGM37604A backlight"
    	depends on I2C
    ```
-4. Config: arm64 `defconfig` plus `haltia-j606l.config`.
-5. `make Image.gz modules qcom/sm6115-lenovo-j606l.dtb`, then
+4. USB: `patches/0004-*.patch` makes `dwc3-qcom-legacy` set the UTMI pipe
+   clock and the VBUS override again on resume; without it USB is gone
+   after s2idle.
+5. Config: arm64 `defconfig` plus `haltia-j606l.config`.
+6. `make Image.gz modules qcom/sm6115-lenovo-j606l.dtb`, then
    `build-boot.sh <build dir> boot.img` and `fastboot flash recovery_b boot.img`.
 
 The touch firmware (`novatek_ts_fw.bin`) is Lenovo's and stays out of the

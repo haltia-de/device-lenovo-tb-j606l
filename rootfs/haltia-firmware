@@ -25,7 +25,9 @@ mkdir -p $soc $fw/ath10k/WCN3990/hw1.0
 for u in /sys/class/block/*/uevent; do
 	grep -qx PARTNAME=modem_b "$u" && mount -o ro "/dev/$(sed -n 's/^DEVNAME=//p' "$u")" $mnt
 done
-cp $mnt/image/modem.* $mnt/image/wlanmdsp.mbn $mnt/image/adsp.* $mnt/image/cdsp.* $soc/
+# The whole image directory: the modem also needs modem_pr (its MCFG
+# configuration); without it its watchdog fires 40 s into the first start.
+cp -a $mnt/image/. $soc/
 # Board data for board id 0xff; linux-firmware has no Lenovo_P11 entry.
 cp $mnt/image/bdwlan.bin $fw/ath10k/WCN3990/hw1.0/board.bin
 umount $mnt

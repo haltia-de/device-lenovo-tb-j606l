@@ -1,0 +1,43 @@
+--- a/drivers/usb/dwc3/dwc3-qcom-legacy.c
++++ b/drivers/usb/dwc3/dwc3-qcom-legacy.c
+@@ -88,6 +88,7 @@
+ 	enum usb_dr_mode	mode;
+ 	bool			is_suspended;
+ 	bool			pm_suspended;
++	bool			utmi_as_pipe_clk;
+ 	struct icc_path		*icc_path_ddr;
+ 	struct icc_path		*icc_path_apps;
+ };
+@@ -459,6 +460,8 @@
+ 	return 0;
+ }
+ 
++static void dwc3_qcom_select_utmi_clk(struct dwc3_qcom *qcom);
++
+ static int dwc3_qcom_resume(struct dwc3_qcom *qcom, bool wakeup)
+ {
+ 	int ret;
+@@ -483,6 +486,15 @@
+ 	if (ret)
+ 		dev_warn(qcom->dev, "failed to enable interconnect: %d\n", ret);
+ 
++	/*
++	 * QSCRATCH may lose its state while the controller sleeps (s2idle):
++	 * set the UTMI pipe clock and the peripheral VBUS override again.
++	 */
++	if (qcom->utmi_as_pipe_clk)
++		dwc3_qcom_select_utmi_clk(qcom);
++	if (qcom->mode == USB_DR_MODE_PERIPHERAL)
++		dwc3_qcom_vbus_override_enable(qcom, true);
++
+ 	/* Clear existing events from PHY related to L2 in/out */
+ 	for (i = 0; i < qcom->num_ports; i++) {
+ 		dwc3_qcom_setbits(qcom->qscratch_base,
+@@ -790,6 +802,7 @@
+ 	 */
+ 	ignore_pipe_clk = device_property_read_bool(dev,
+ 				"qcom,select-utmi-as-pipe-clk");
++	qcom->utmi_as_pipe_clk = ignore_pipe_clk;
+ 	if (ignore_pipe_clk)
+ 		dwc3_qcom_select_utmi_clk(qcom);
+ 
