@@ -66,7 +66,8 @@ install -D -m 755 "$SRC/rootfs/desktop.start" "$ROOT/etc/local.d/desktop.start"
 mkdir -p "$ROOT/etc/haltia"
 echo "$PACKAGES" | tr -s ' \t\n' '\n' | sed '/^$/d' > "$ROOT/etc/haltia/firstboot.packages"
 mkdir -p "$ROOT/var/lib/haltia"
-[ "${RELEASE:-0}" = 1 ] || touch "$ROOT/etc/haltia/debug-shell"
+# DEBUG=1 adds a passwordless USB root shell for development.
+[ "${DEBUG:-0}" != 1 ] || touch "$ROOT/etc/haltia/debug-shell"
 
 if [ -n "${KERNEL_TAR:-}" ]; then
 	tar -C "$ROOT" -xf "$KERNEL_TAR"
