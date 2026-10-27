@@ -8,7 +8,9 @@
 # the image, so the first boot needs no network.
 #
 # Environment: ROOT (default /work/rootfs), KERNEL_TAR (modules tarball,
-# optional), IMAGE (default /work/haltia-root.ext4), IMAGE_MB (default 6144).
+# optional), IMAGE (default /work/haltia-root.ext4), IMAGE_MB (default 6144),
+# OVERLAY (optional: a tree copied over the root last, such as shell files
+# that are newer than the published packages).
 set -eu
 SRC=$(cd "$(dirname "$0")/.." && pwd)
 ROOT=${ROOT:-/work/rootfs}
@@ -17,7 +19,7 @@ IMAGE_MB=${IMAGE_MB:-6144}
 MIRROR=${MIRROR:-https://dl-cdn.alpinelinux.org/alpine/v3.24}
 HALTIA_REPO=${HALTIA_REPO:-https://haltia-de.github.io/packages/alpine/v3.24}
 
-apk add --no-cache e2fsprogs tar >/dev/null
+apk add --no-cache e2fsprogs tar kmod >/dev/null
 
 PACKAGES="alpine-base openrc busybox-openrc busybox-binsh eudev udev-init-scripts udev-init-scripts-openrc
 	seatd seatd-openrc libinput dbus dbus-openrc elogind polkit polkit-elogind
@@ -79,6 +81,7 @@ install -D -m 644 "$SRC/rootfs/ucm/Lenovo-TB-J606L.conf" "$ROOT/usr/share/alsa/u
 install -D -m 644 "$SRC/rootfs/ucm/HiFi.conf" "$ROOT/usr/share/alsa/ucm2/Lenovo/TB-J606L/HiFi.conf"
 install -D -m 644 "$SRC/rootfs/91-fastrpc.rules" "$ROOT/etc/udev/rules.d/91-fastrpc.rules"
 install -D -m 644 "$SRC/rootfs/81-j606l-sensors.rules" "$ROOT/etc/udev/rules.d/81-j606l-sensors.rules"
+install -D -m 644 "$SRC/rootfs/82-j606l-battery.rules" "$ROOT/etc/udev/rules.d/82-j606l-battery.rules"
 for s in hexagonrpcd-adsp-rootpd hexagonrpcd-adsp-sensorspd; do
 	install -D -m 644 "$SRC/rootfs/hexagonrpcd.confd" "$ROOT/etc/conf.d/$s"
 done
@@ -103,10 +106,22 @@ fi
 
 if [ -n "${KERNEL_TAR:-}" ]; then
 	tar -C "$ROOT" -xf "$KERNEL_TAR"
+	# udev loads drivers from the first boot on, before haltia-firstboot.
+	for k in "$ROOT"/lib/modules/*/; do
+		depmod -b "$ROOT" "$(basename "$k")"
+	done
 fi
 if [ -d "${FIRMWARE:-/nonexistent}" ]; then
 	mkdir -p "$ROOT/lib/firmware"
 	cp -a "$FIRMWARE"/. "$ROOT/lib/firmware/"
+fi
+
+if [ -d "${OVERLAY:-/nonexistent}" ]; then
+	cp -a "$OVERLAY"/. "$ROOT/"
+	# Owned by root, whoever owns the tree on the host.
+	(cd "$OVERLAY" && find . -mindepth 1) | while read -r f; do
+		chown -h 0:0 "$ROOT/$f"
+	done
 fi
 
 rm -f "$IMAGE"
