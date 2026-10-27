@@ -53,8 +53,9 @@ CCI без голоса интерконнекта роняет SoC в EDL (900e
   считал ошибки CRC и ECC на каждом пакете, кадров не было. Середина окна
   D-PHY (115 нс + 8 UI) работает на 180 и 360 МГц.
 - DTS: CCI, CAMSS (по образцу `agatti.dtsi`), фиксированные регуляторы на
-  GPIO 112/108, OV8856 (`link-frequencies` 360 и 180 МГц, `rotation = 0`:
-  картинка прямая, когда планшет держат горизонтально, как считает оболочка).
+  GPIO 112/108, OV8856 (`link-frequencies` 360 и 180 МГц, `rotation = 270` от книжной ориентации
+  панели, как `sensor-position-roll` в стоке; `haltia_kit` поворачивает
+  картинку на это и на поворот экрана из `$XDG_RUNTIME_DIR/haltia/rotation`).
 - Конфиг: `VIDEO_QCOM_CAMSS`, `I2C_QCOM_CCI`, `VIDEO_OV8856`, кучи DMA-BUF.
   В cmdline `cma=256M`: программный ISP берёт буферы из CMA, 32 МБ не хватало.
 - Rootfs: `libcamera`, `libcamera-ipa`, `libcamera-tools`,
@@ -89,6 +90,9 @@ v4l2-ctl -d /dev/video0 --set-fmt-video=width=3280,height=2464,pixelformat=pgAA 
 
 Кадр — MIPI RAW10 с шагом строки 4104 байта, GRBG. Номер шины I2C у
 датчика меняется от загрузки к загрузке.
+
+Осторожно: перезагрузка с открытой камерой зависла после остановки тача
+(27 октября); перед `reboot` камеру закрыть.
 
 Осторожно: чтение регистров CSID через `/dev/mem`, когда у CAMSS сняты
 такты, роняет SoC в EDL (900e).

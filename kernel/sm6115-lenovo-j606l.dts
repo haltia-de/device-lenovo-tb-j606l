@@ -721,8 +721,10 @@
 				pinctrl-names = "default";
 				reset-gpios = <&tlmm 19 GPIO_ACTIVE_LOW>;
 				orientation = <0>;
-				/* Upright when the tablet is held in landscape, the shell's normal. */
-				rotation = <0>;
+				/* Turned 270 degrees from the panel's portrait, as in the stock
+				 * device tree (sensor-position-roll); haltia_kit turns the
+				 * picture by this and by the screen's rotation. */
+				rotation = <270>;
 				avdd-supply = <&cam_avdd>;
 				dvdd-supply = <&cam_dvdd>;
 
