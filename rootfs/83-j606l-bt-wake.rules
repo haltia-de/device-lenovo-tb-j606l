@@ -1,0 +1,3 @@
+# The Bluetooth UART's RX line woke the system from s2idle at once, every
+# time; Bluetooth does not wake the tablet.
+ACTION=="add", SUBSYSTEM=="platform", KERNEL=="4a8c000.serial", ATTR{power/wakeup}="disabled"

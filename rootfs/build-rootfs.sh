@@ -82,6 +82,7 @@ install -D -m 644 "$SRC/rootfs/ucm/HiFi.conf" "$ROOT/usr/share/alsa/ucm2/Lenovo/
 install -D -m 644 "$SRC/rootfs/91-fastrpc.rules" "$ROOT/etc/udev/rules.d/91-fastrpc.rules"
 install -D -m 644 "$SRC/rootfs/81-j606l-sensors.rules" "$ROOT/etc/udev/rules.d/81-j606l-sensors.rules"
 install -D -m 644 "$SRC/rootfs/82-j606l-battery.rules" "$ROOT/etc/udev/rules.d/82-j606l-battery.rules"
+install -D -m 644 "$SRC/rootfs/83-j606l-bt-wake.rules" "$ROOT/etc/udev/rules.d/83-j606l-bt-wake.rules"
 for s in hexagonrpcd-adsp-rootpd hexagonrpcd-adsp-sensorspd; do
 	install -D -m 644 "$SRC/rootfs/hexagonrpcd.confd" "$ROOT/etc/conf.d/$s"
 done
