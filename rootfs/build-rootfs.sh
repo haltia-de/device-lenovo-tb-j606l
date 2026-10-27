@@ -94,6 +94,7 @@ install -D -m 644 "$SRC/rootfs/50-haltia-j606l-sensors.rules" "$ROOT/etc/polkit-
 install -D -m 644 "$SRC/rootfs/device.conf" "$ROOT/etc/haltia/device.conf"
 install -D -m 755 "$SRC/rootfs/bt-address.start" "$ROOT/etc/local.d/10-bt-address.start"
 install -D -m 755 "$SRC/rootfs/haltia-dbmd8" "$ROOT/usr/sbin/haltia-dbmd8"
+install -D -m 755 "$SRC/rootfs/haltia-suspend" "$ROOT/usr/lib/haltia/hooks/suspend"
 install -D -m 755 "$SRC/rootfs/dbmd8.initd" "$ROOT/etc/init.d/dbmd8"
 install -D -m 755 "$SRC/rootfs/desktop.start" "$ROOT/etc/local.d/desktop.start"
 mkdir -p "$ROOT/etc/haltia"

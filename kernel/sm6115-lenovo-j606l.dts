@@ -836,3 +836,27 @@
 		bias-disable;
 	};
 };
+
+/* The ADSP sensor framework learns from the "sleepstate" entry whether
+ * the system is awake, and wakes it through "sleepstate_see", as in the
+ * stock tree (qcom,smp2p_sleepstate; driver in patch 0013). */
+&{/smp2p-adsp} {
+	adsp_sleepstate_out: sleepstate-out {
+		qcom,entry-name = "sleepstate";
+		#qcom,smem-state-cells = <1>;
+	};
+
+	adsp_sleepstate_in: sleepstate-in {
+		qcom,entry-name = "sleepstate_see";
+		interrupt-controller;
+		#interrupt-cells = <2>;
+	};
+};
+
+/ {
+	smp2p-sleepstate {
+		compatible = "qcom,smp2p-sleepstate";
+		qcom,smem-states = <&adsp_sleepstate_out 0>;
+		interrupts-extended = <&adsp_sleepstate_in 0 IRQ_TYPE_EDGE_RISING>;
+	};
+};

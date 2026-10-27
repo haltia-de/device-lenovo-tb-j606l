@@ -54,6 +54,18 @@ packs the modules as `<work>/modules.tar` for `rootfs/build-rootfs.sh`
 - `0012` the CAMSS CSIPHY settle count waits the middle of the D-PHY
   window instead of its minimum; at 180 MHz every packet had CRC errors.
   See `docs/camera.md`.
+- `0013` the SMP2P sleep state driver from downstream: bit 12 of the
+  ADSP's "sleepstate" entry tells its sensor framework whether the system
+  is awake, and its "sleepstate_see" bit wakes the system.
+- `0014` the NT36523 panel removes itself from the panel list when its DSI
+  attach fails; it was freed while still listed, and the touch driver
+  following it oopsed (issue #24).
+- `0015` fastrpc takes a hard wakeup event for every message from the DSP,
+  so a system in s2idle wakes and user space can answer.
+- `0016` fastrpc resumes an invocation a signal interrupted instead of
+  sending it again. The freezer interrupts hexagonrpcd's listener on every
+  suspend; the duplicate crashed the ADSP sensor process at resume
+  (issue #23). See `docs/sleep.md`.
 
 The touch firmware (`novatek_ts_fw.bin`) and the modem images are Lenovo's
 and stay out of the repository: `rootfs/haltia-firmware` copies them from
