@@ -39,6 +39,11 @@ packs the modules as `<work>/modules.tar` for `rootfs/build-rootfs.sh`
   sm8250 machine driver: 24-bit samples in 32-bit slots. The microphones
   pass through a DSP Group DBMD8 voice processor, which has no driver yet,
   so capture carries noise only.
+- `0008` double tap to wake. The panel keeps the NT36523W (a TDDI chip)
+  powered and out of reset while the display sleeps
+  (`novatek,tddi-touch-wake`). The touch driver puts its half into the
+  gesture mode and reports the double tap as `KEY_WAKEUP`
+  (`novatek,double-tap-wake`, sysfs `double_tap_wake`).
 
 The touch firmware (`novatek_ts_fw.bin`) and the modem images are Lenovo's
 and stay out of the repository: `rootfs/haltia-firmware` copies them from

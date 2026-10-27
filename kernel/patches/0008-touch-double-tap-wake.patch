@@ -1,0 +1,294 @@
+From: Mikhail Nevskiy <rensomail@gmail.com>
+Subject: [PATCH] Wake the J606L from sleep by a double tap on the screen
+
+The NT36523W is a TDDI chip: its touch half can watch for a double tap
+in a gesture mode while the display sleeps, but only if the chip keeps
+power and stays out of reset.
+
+panel-novatek-nt36523: with "novatek,tddi-touch-wake", unprepare leaves
+the chip powered and out of reset (it is in sleep mode after disable);
+prepare resets and initialises it as before.
+
+nt36xxx: with "novatek,double-tap-wake" the touch enters the gesture
+mode (host command 0x13) when the panel starts to turn off, its IRQ
+wakes the system, and the double-tap gesture (id 15) is reported as
+KEY_WAKEUP. sysfs double_tap_wake turns it on or off. The probe's and
+the suspend path's pm_stay_awake calls are balanced or dropped: once
+the device is a wakeup source they aborted every system sleep.
+
+---
+diff -Naur a/drivers/gpu/drm/panel/panel-novatek-nt36523.c b/drivers/gpu/drm/panel/panel-novatek-nt36523.c
+--- a/drivers/gpu/drm/panel/panel-novatek-nt36523.c
++++ b/drivers/gpu/drm/panel/panel-novatek-nt36523.c
+@@ -32,6 +32,9 @@
+ 	struct gpio_desc *reset_gpio;
+ 	struct backlight_device *backlight;
+ 	struct regulator *vddio;
++	/* novatek,tddi-touch-wake: keep the chip on for the touch wakeup */
++	bool touch_wake;
++	bool vddio_on;
+ };
+ 
+ struct panel_desc {
+@@ -997,10 +1000,13 @@
+ 	struct panel_info *pinfo = to_panel_info(panel);
+ 	int ret;
+ 
+-	ret = regulator_enable(pinfo->vddio);
+-	if (ret) {
+-		dev_err(panel->dev, "failed to enable vddio regulator: %d\n", ret);
+-		return ret;
++	if (!pinfo->vddio_on) {
++		ret = regulator_enable(pinfo->vddio);
++		if (ret) {
++			dev_err(panel->dev, "failed to enable vddio regulator: %d\n", ret);
++			return ret;
++		}
++		pinfo->vddio_on = pinfo->touch_wake;
+ 	}
+ 
+ 	nt36523_reset(pinfo);
+@@ -1008,6 +1014,7 @@
+ 	ret = pinfo->desc->init_sequence(pinfo);
+ 	if (ret < 0) {
+ 		regulator_disable(pinfo->vddio);
++		pinfo->vddio_on = false;
+ 		dev_err(panel->dev, "failed to initialize panel: %d\n", ret);
+ 		return ret;
+ 	}
+@@ -1041,6 +1048,14 @@
+ {
+ 	struct panel_info *pinfo = to_panel_info(panel);
+ 
++	/*
++	 * The touch half of this TDDI chip watches for a wakeup gesture while
++	 * the display sleeps: leave the chip powered and out of reset. It
++	 * went into sleep mode in nt36523_disable, and prepare resets it.
++	 */
++	if (pinfo->touch_wake)
++		return 0;
++
+ 	gpiod_set_value_cansleep(pinfo->reset_gpio, 1);
+ 	regulator_disable(pinfo->vddio);
+ 
+@@ -1173,6 +1188,8 @@
+ 	if (IS_ERR(pinfo->vddio))
+ 		return dev_err_probe(dev, PTR_ERR(pinfo->vddio), "failed to get vddio regulator\n");
+ 
++	pinfo->touch_wake = of_property_read_bool(dev->of_node, "novatek,tddi-touch-wake");
++
+ 	pinfo->reset_gpio = devm_gpiod_get(dev, "reset", GPIOD_OUT_HIGH);
+ 	if (IS_ERR(pinfo->reset_gpio))
+ 		return dev_err_probe(dev, PTR_ERR(pinfo->reset_gpio), "failed to get reset gpio\n");
+diff -Naur a/drivers/input/touchscreen/nt36523/nt36xxx.c b/drivers/input/touchscreen/nt36523/nt36xxx.c
+--- a/drivers/input/touchscreen/nt36523/nt36xxx.c
++++ b/drivers/input/touchscreen/nt36523/nt36xxx.c
+@@ -773,6 +773,7 @@
+ 	/* Older firmware (Lenovo J606) packs 12-bit coordinates in the screen's
+ 	 * own range instead of 16-bit ones. */
+ 	ts->coords_12bit = of_property_read_bool(np, "novatek,coords-12bit");
++	ts->double_tap_capable = of_property_read_bool(np, "novatek,double-tap-wake");
+ 	ts->invert_x = of_property_read_bool(np, "touchscreen-inverted-x");
+ 	ts->invert_y = of_property_read_bool(np, "touchscreen-inverted-y");
+ 	nvt_apply_android16_range();
+@@ -961,6 +962,31 @@
+ return:
+ 	n.a.
+ *******************************************************/
++/* Wakeup gesture ids of the Novatek firmware: a double tap, or an id
++ * given by the data protocol's function page. */
++#define GESTURE_DOUBLE_CLICK	15
++#define GESTURE_DATA_PROTOCOL	30
++#define GESTURE_FUNCPAGE	1
++
++/* In wakeup gesture mode the chip reports only gestures; a double tap
++ * becomes KEY_WAKEUP. */
++static void nvt_ts_wakeup_gesture_report(const uint8_t *data)
++{
++	uint8_t id = data[1] >> 3;
++
++	if (id == GESTURE_DATA_PROTOCOL && data[2] == GESTURE_FUNCPAGE)
++		id = data[3];
++	NVT_LOG("gesture id %u (%02x %02x %02x)\n", id, data[1], data[2], data[3]);
++	if (id != GESTURE_DOUBLE_CLICK)
++		return;
++
++	pm_wakeup_event(&ts->client->dev, 0);
++	input_report_key(ts->input_dev, KEY_WAKEUP, 1);
++	input_sync(ts->input_dev);
++	input_report_key(ts->input_dev, KEY_WAKEUP, 0);
++	input_sync(ts->input_dev);
++}
++
+ static irqreturn_t nvt_ts_work_func(int irq, void *data)
+ {
+ 	int32_t ret = -1;
+@@ -1034,6 +1060,11 @@
+ 		goto XFER_ERROR;
+ 	}
+ 
++	if (!bTouchIsAwake) {
++		nvt_ts_wakeup_gesture_report(point_data);
++		goto XFER_ERROR;
++	}
++
+ 	finger_cnt = 0;
+ 
+ 	for (i = 0; i < ts->max_touch_num; i++) {
+@@ -1278,6 +1309,47 @@
+ 	nvt_ts_resume(&ts_core->client->dev);
+ }
+ 
++/* /sys/bus/spi/devices/spi0.0/double_tap_wake: 1 to wake by a double tap
++ * while the system sleeps. Changed while asleep, it applies at resume. */
++static ssize_t double_tap_wake_show(struct device *dev,
++				    struct device_attribute *attr, char *buf)
++{
++	int v = ts->gesture_command_delayed >= 0 ? ts->gesture_command_delayed :
++						     ts->db_wakeup;
++
++	return sysfs_emit(buf, "%d\n", v);
++}
++
++static ssize_t double_tap_wake_store(struct device *dev,
++				     struct device_attribute *attr,
++				     const char *buf, size_t count)
++{
++	bool on;
++	int ret;
++
++	ret = kstrtobool(buf, &on);
++	if (ret)
++		return ret;
++	if (on && !ts->double_tap_capable)
++		return -EOPNOTSUPP;
++
++	mutex_lock(&ts->lock);
++	if (bTouchIsAwake)
++		ts->db_wakeup = on;
++	else
++		ts->gesture_command_delayed = on;
++	mutex_unlock(&ts->lock);
++
++	return count;
++}
++static DEVICE_ATTR_RW(double_tap_wake);
++
++static struct attribute *nvt_attrs[] = {
++	&dev_attr_double_tap_wake.attr,
++	NULL
++};
++ATTRIBUTE_GROUPS(nvt);
++
+ /*******************************************************
+ Description:
+ 	Novatek touchscreen driver probe function.
+@@ -1452,7 +1524,11 @@
+ 	ts->input_dev->keybit[BIT_WORD(BTN_TOUCH)] = BIT_MASK(BTN_TOUCH);
+ 	ts->input_dev->propbit[0] = BIT(INPUT_PROP_DIRECT);
+ 
+-	ts->db_wakeup = 0;
++	ts->db_wakeup = ts->double_tap_capable;
++	if (ts->double_tap_capable) {
++		input_set_capability(ts->input_dev, EV_KEY, KEY_WAKEUP);
++		device_init_wakeup(&client->dev, true);
++	}
+ 	ts->fw_ver = 0;
+ 	ts->x_num = 32;
+ 	ts->y_num = 50;
+@@ -1625,6 +1701,9 @@
+ 
+ 	bTouchIsAwake = 1;
+ 	disable_pen_input_device(false);
++	/* The probe's pm_stay_awake: once the device can wake the system, an
++	 * event left active would end every system sleep at once. */
++	pm_relax(&client->dev);
+ 	NVT_LOG("end\n");
+ 
+ 	nvt_irq_enable(true);
+@@ -1790,7 +1869,8 @@
+ 		return 0;
+ 	}
+ 
+-	pm_stay_awake(dev);
++	/* No pm_stay_awake here: the panel turns off inside a system sleep,
++	 * and a wakeup event then would abort it. */
+ 	ts->ic_state = NVT_IC_SUSPEND_IN;
+ 
+ 	if (!ts->db_wakeup) {
+@@ -1819,13 +1899,10 @@
+ 
+ 	if (ts->db_wakeup) {
+ 		/*---write command to enter "wakeup gesture mode"---*/
+-		/*DoubleClick wakeup CMD was sent by display to meet timing*/
+-		/*
+ 		buf[0] = EVENT_MAP_HOST_CMD;
+ 		buf[1] = 0x13;
+ 		CTP_SPI_WRITE(ts->client, buf, 2);
+-		*/
+-		enable_irq_wake(ts->client->irq);
++		/* nvt_pm_suspend makes the interrupt a wakeup source. */
+ 
+ 		NVT_LOG("Enabled touch wakeup gesture\n");
+ 	} else {
+@@ -1859,7 +1936,6 @@
+ 		ts->ic_state = NVT_IC_SUSPEND_OUT;
+ 	else
+ 		NVT_ERR("IC state may error,caused by suspend/resume flow, please CHECK!!");
+-	pm_relax(dev);
+ 	NVT_LOG("end\n");
+ 
+ 	return 0;
+@@ -2005,6 +2081,24 @@
+ 	return 0;
+ }
+ 
++/* With the wakeup gesture the touch goes into gesture mode before the
++ * display goes off and to sleep, as the chip wants it. */
++static int nt36xxx_panel_disabling(struct drm_panel_follower *follower)
++{
++	struct nvt_ts_data *ts = container_of(follower, struct nvt_ts_data,
++					      panel_follower);
++
++	if (!ts->db_wakeup)
++		return 0;
++
++	ts->panel_on = false;
++
++	if (ts->event_wq)
++		flush_workqueue(ts->event_wq);
++
++	return nvt_ts_suspend(&ts->client->dev);
++}
++
+ static int nt36xxx_panel_unpreparing(struct drm_panel_follower *follower)
+ {
+ 	struct nvt_ts_data *ts = container_of(follower, struct nvt_ts_data,
+@@ -2020,6 +2114,7 @@
+ 
+ static struct drm_panel_follower_funcs nt36xxx_panel_follower_funcs = {
+ 	.panel_prepared = nt36xxx_panel_prepared,
++	.panel_disabling = nt36xxx_panel_disabling,
+ 	.panel_unpreparing = nt36xxx_panel_unpreparing,
+ };
+ #endif
+@@ -2053,6 +2148,7 @@
+ #ifdef CONFIG_PM
+ 		.pm = &nvt_dev_pm_ops,
+ #endif
++		.dev_groups = nvt_groups,
+ #ifdef CONFIG_OF
+ 		.of_match_table = nvt_match_table,
+ #endif
+diff -Naur a/drivers/input/touchscreen/nt36523/nt36xxx.h b/drivers/input/touchscreen/nt36523/nt36xxx.h
+--- a/drivers/input/touchscreen/nt36523/nt36xxx.h
++++ b/drivers/input/touchscreen/nt36523/nt36xxx.h
+@@ -144,6 +144,8 @@
+ 	uint32_t raw_y_max;
+ 	bool swap_xy;
+ 	bool coords_12bit;
++	/* novatek,double-tap-wake: a double tap wakes the system from sleep */
++	bool double_tap_capable;
+ 	bool invert_x;
+ 	bool invert_y;
+ 	uint8_t max_touch_num;

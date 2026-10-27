@@ -154,6 +154,8 @@
 		novatek,spi-rd-fast-addr = <0x3f310>;
 		novatek,event-buf-addr = <0x2fe00>;
 		novatek,coords-12bit;
+		/* A double tap wakes the tablet from sleep (gesture mode). */
+		novatek,double-tap-wake;
 		touchscreen-size-x = <1200>;
 		touchscreen-size-y = <2000>;
 	};
@@ -418,4 +420,10 @@
 			output-high;
 		};
 	};
+};
+
+/* The touch half of the TDDI chip needs it powered and out of reset while
+ * the display sleeps, to see the double tap that wakes the tablet. */
+&panel {
+	novatek,tddi-touch-wake;
 };

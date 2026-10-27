@@ -35,7 +35,7 @@ PACKAGES="alpine-base openrc busybox-openrc busybox-binsh eudev udev-init-script
 	zstd qrtr rmtfs rmtfs-openrc tqftpserv tqftpserv-openrc linux-firmware-ath10k linux-firmware-qca bluez bluez-openrc bluez-btmgmt
 	hexagonrpcd hexagonrpcd-openrc libssc
 	bash htop nano e2fsprogs e2fsprogs-extra kmod util-linux python3
-	haltia-keys haltia-desktop haltia-music haltia-weather"
+	haltia-keys haltia-desktop haltia-music haltia-weather haltia-messenger"
 
 rm -rf "$ROOT"
 mkdir -p "$ROOT/etc/apk/keys" "$ROOT/etc/apk/cache"
