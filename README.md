@@ -25,7 +25,7 @@ tablet. Do not boot the J606F one-shot image again.*
 
 ## Состояние на 27 октября 2026
 
-Haltia стоит вторым системой рядом с Android (слот B, Linux в `recovery_b`
+Haltia стоит второй системой рядом с Android (слот B, Linux в `recovery_b`
 и разделе `haltia`). Работают экран, касание с двойным тапом, Wi-Fi,
 Bluetooth, звук, микрофоны, зарядка и батарея, поворот, кнопки, фронтальная
 камера через libcamera. Не работают пока основная камера, наушники, OTG,
