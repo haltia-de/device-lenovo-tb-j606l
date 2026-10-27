@@ -44,6 +44,16 @@ packs the modules as `<work>/modules.tar` for `rootfs/build-rootfs.sh`
   (`novatek,tddi-touch-wake`). The touch driver puts its half into the
   gesture mode and reports the double tap as `KEY_WAKEUP`
   (`novatek,double-tap-wake`, sysfs `double_tap_wake`).
+- `0009` the eGPIO function for SM6115 GPIOs 98-112, as on QCM2290. Until
+  the TLMM claims such a pad another subsystem owns it; GPIOs 108 and 112
+  power the camera sensors.
+- `0010` an SM6115 CAMSS: the QCM2290 CSIDs and TFEs plus a third CSIPHY,
+  which the front camera uses.
+- `0011` the OV8856 driver keeps the Bayer order set_format chose;
+  get_format and open() reset it, and libcamera's stream failed with EPIPE.
+- `0012` the CAMSS CSIPHY settle count waits the middle of the D-PHY
+  window instead of its minimum; at 180 MHz every packet had CRC errors.
+  See `docs/camera.md`.
 
 The touch firmware (`novatek_ts_fw.bin`) and the modem images are Lenovo's
 and stay out of the repository: `rootfs/haltia-firmware` copies them from

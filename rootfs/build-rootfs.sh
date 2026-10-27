@@ -36,7 +36,8 @@ PACKAGES="alpine-base openrc busybox-openrc busybox-binsh eudev udev-init-script
 	hexagonrpcd hexagonrpcd-openrc libssc py3-libgpiod
 	libcamera libcamera-ipa libcamera-tools libcamera-gstreamer
 	bash htop nano e2fsprogs e2fsprogs-extra kmod util-linux python3
-	haltia-keys haltia-desktop haltia-music haltia-weather haltia-messenger"
+	haltia-keys haltia-desktop haltia-music haltia-weather haltia-messenger
+	haltia-camera haltia-mail haltia-documents"
 
 rm -rf "$ROOT"
 mkdir -p "$ROOT/etc/apk/keys" "$ROOT/etc/apk/cache"
