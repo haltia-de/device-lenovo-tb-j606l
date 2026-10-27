@@ -1,0 +1,22 @@
+cpuidle: psci: Initialize after the deferred probes.
+
+The psci-cpuidle faux device probes once, at device_initcall. With the
+MPM as the parent of both CPU cluster domains, the PSCI domains defer
+until the MPM probes and arrive only from the deferred probe work. So
+the cpuidle driver found no domain ("CPU 0 failed to PSCI idle") and
+the CPUs only ever ran WFI. late_initcall_sync comes after
+deferred_probe_initcall has run and flushed them.
+
+--- a/drivers/cpuidle/cpuidle-psci.c
++++ b/drivers/cpuidle/cpuidle-psci.c
+@@ -489,4 +489,9 @@
+ 
+ 	return 0;
+ }
+-device_initcall(psci_idle_init);
++/*
++ * The faux device probes once. The CPU PM domains may still wait for a
++ * parent domain (the MPM on SM6115 and QCM2290) and come only from the
++ * deferred probes, which late_initcall runs and waits for.
++ */
++late_initcall_sync(psci_idle_init);

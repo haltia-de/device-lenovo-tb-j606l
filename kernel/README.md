@@ -66,6 +66,10 @@ packs the modules as `<work>/modules.tar` for `rootfs/build-rootfs.sh`
   sending it again. The freezer interrupts hexagonrpcd's listener on every
   suspend; the duplicate crashed the ADSP sensor process at resume
   (issue #23). See `docs/sleep.md`.
+- `0017` psci-cpuidle initializes at late_initcall_sync. Its faux device
+  probes once, and with the MPM as the CPU clusters' parent the PSCI
+  domains come only from the deferred probes; cpuidle failed and the CPUs
+  only ran WFI.
 
 The touch firmware (`novatek_ts_fw.bin`) and the modem images are Lenovo's
 and stay out of the repository: `rootfs/haltia-firmware` copies them from

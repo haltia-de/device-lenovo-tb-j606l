@@ -49,14 +49,15 @@ while [ "$n" -lt "$MAX" ]; do
 	sleep 1
 done
 
-# Started at once after the wake, the proxy found the accelerometer but
-# got no readings ("orientation: undefined"); a few seconds later it does.
+# After a wake the proxy often finds the accelerometer without readings
+# ("orientation: undefined", or no accelerometer at all yet); started
+# again it usually reads. Up to five starts, until it gives an orientation.
 sleep 3
-for try in 1 2 3; do
+for try in 1 2 3 4 5; do
 	rc-service iio-sensor-proxy restart >/dev/null 2>&1
-	sleep 4
-	(timeout 4 monitor-sensor 2>/dev/null) 2>/dev/null |
-		grep -q "orientation: undefined" || break
-	echo "haltia-suspend: no accelerometer readings, starting the proxy again"
+	sleep 5
+	(timeout 6 monitor-sensor 2>/dev/null) 2>/dev/null |
+		grep -q -E "orientation: (normal|left-up|right-up|bottom-up)" && break
+	echo "haltia-suspend: no accelerometer readings (start $try)"
 done
 exit 0
