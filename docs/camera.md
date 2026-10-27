@@ -53,10 +53,14 @@ CCI без голоса интерконнекта роняет SoC в EDL (900e
   считал ошибки CRC и ECC на каждом пакете, кадров не было. Середина окна
   D-PHY (115 нс + 8 UI) работает на 180 и 360 МГц.
 - DTS: CCI, CAMSS (по образцу `agatti.dtsi`), фиксированные регуляторы на
-  GPIO 112/108, OV8856 (`link-frequencies` 360 и 180 МГц, `rotation = 90`: `haltia_kit` поворачивает
-  картинку на это и на поворот экрана из `$XDG_RUNTIME_DIR/haltia/rotation`,
-  потом зеркалит. Проверено на планшете: 0 — верх вправо, 270 (как
-  `sensor-position-roll` в стоке) — вверх ногами, 90 — прямо).
+  GPIO 112/108, OV8856 (`link-frequencies` 360 и 180 МГц, `orientation = 0`,
+  `rotation = 90`).
+- Поворот. `haltia_kit` берёт `api.libcamera.Rotation` из GStreamer,
+  прибавляет поворот экрана из `$XDG_RUNTIME_DIR/haltia/rotation` (его пишет
+  `haltia-rotate`, в горизонтальном «normal» здесь `270`), поворачивает
+  кадр и потом зеркалит фронтальную. Проверено в «Камере»: `rotation = 0` —
+  верх вправо, `270` (как `sensor-position-roll` в стоке) — вверх ногами,
+  `90` — прямо.
 - Конфиг: `VIDEO_QCOM_CAMSS`, `I2C_QCOM_CCI`, `VIDEO_OV8856`, кучи DMA-BUF.
   В cmdline `cma=256M`: программный ISP берёт буферы из CMA, 32 МБ не хватало.
 - Rootfs: `libcamera`, `libcamera-ipa`, `libcamera-tools`,
@@ -98,12 +102,35 @@ v4l2-ctl -d /dev/video0 --set-fmt-video=width=3280,height=2464,pixelformat=pgAA 
 Осторожно: чтение регистров CSID через `/dev/mem`, когда у CAMSS сняты
 такты, роняет SoC в EDL (900e).
 
+## Как исследовали
+
+- Root в Android на слоте B: Magisk 31.1 пропатчил `boot_b` (сток и
+  `vbmeta_b` сохранены в `backups/2026-10-27-magisk/`), в Magisk разрешён
+  Shell. Команды — `adb shell "su -c '...'"`, sysfs требует `setenforce 0`,
+  debugfs нет.
+- Лог стокового драйвера камеры: `echo 0xffffffff >
+  /sys/module/cam_debug_util/parameters/debug_mdl` (все модули; биты в
+  `cam_debug_util.h`: sensor `1<<5`, CCI `1<<14`, CSIPHY `1<<15`, util
+  `1<<17`, res `1<<21`), `dmesg -c`, открыть камеру, `dmesg`. Полный лог
+  одного открытия — около 11 000 строк. В логе видны
+  шаги питания с номерами GPIO (база TLMM 1167), такты CPAS и CCI, и все
+  записи регистров датчика (`cam_cci_data_queue ... addr ... data`).
+- GPIO в Android: `/sys/class/gpio`, номер = 1167 + пин. 108 и 112 там
+  читаются как вход `0` после записи `1` так же, как в Linux без eGPIO.
+- В Linux: регистры TLMM и GCC через `/dev/mem` (`CONFIG_DEVMEM`), тайл
+  south `0x900000`, шаг пина `0x1000`; GCC MCLK2 CBCR `0x1451050`. Регистры
+  CSID 340 (`0x5c6e000`): `0x20` — RX IRQ, `0x164` — ECC, `0x168` — CRC
+  (раскладка из `cam_tfe_csid530.h`).
+- Стоковое дерево разобрано из `dtbo` и `boot_b` (узлы `qcom,cam-sensor*`,
+  `qcom,cci0`, `qcom,csiphy*`, `qcom,tfe*`).
+
 ## Что осталось
 
 - Основная OV13B10: в драйвере `ov13b10` нет таблицы OF (только ACPI),
   нужен патч, плюс CSIPHY0, MCLK0, сброс GPIO 18, VAF GPIO 40. Автофокус,
   вспышка и EEPROM — позже.
 - Голоса интерконнекта и такты AXI задаёт CAMSS; в CCI их не добавлять.
-- Sensor helper и калибровка OV8856 для libcamera, приложение камеры в оболочке.
+- Sensor helper и калибровка OV8856 для libcamera.
+- Ошибка связки тача и панели при сбое probe панели (#24).
 - В `dmesg` идёт поток `qcom_q6v5_pas a400000.remoteproc: Handover signaled,
   but it already happened` — с камерами не проверено.
