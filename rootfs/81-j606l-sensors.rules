@@ -1,0 +1,5 @@
+# The J606L's accelerometer and proximity sensor sit on the ADSP sensor
+# core; iio-sensor-proxy reaches them through libssc. The firmware gives no
+# mount matrix; this one makes "normal" the landscape the tablet is held in,
+# as the shell expects (device.conf transform_offset turns the portrait panel).
+SUBSYSTEM=="misc", KERNEL=="fastrpc-adsp*", ENV{IIO_SENSOR_PROXY_TYPE}+="ssc-accel ssc-proximity", ENV{ACCEL_MOUNT_MATRIX}="0, 1, 0; -1, 0, 0; 0, 0, 1"

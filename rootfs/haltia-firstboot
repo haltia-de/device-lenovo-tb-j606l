@@ -1,0 +1,102 @@
+#!/bin/sh
+# First boot of a TB-J606L root built on an x86 host with apk --no-scripts:
+# run every package's pre-install and post-install script, then the
+# triggers, natively on the tablet. Then the device setup that needs
+# chroot-level tools (users, groups, services). Output: /var/log/firstboot.log.
+exec >>/var/log/firstboot.log 2>&1
+set -x
+export PATH=/usr/sbin:/usr/bin:/sbin:/bin
+
+work=/run/haltia-firstboot
+mkdir -p "$work"
+tar -xzf /lib/apk/db/scripts.tar.gz -C "$work"
+
+# Packages in database order, which is the order apk installed them.
+awk -F: '/^P:/{p=$2} /^V:/{print p, $2}' /lib/apk/db/installed > "$work/order"
+for phase in pre-install post-install; do
+	while read -r p v; do
+		for s in "$work/$p-$v".*."$phase"; do
+			[ -f "$s" ] || continue
+			chmod +x "$s"
+			"$s" "$v" || echo "firstboot: $s failed"
+		done
+	done < "$work/order"
+done
+
+# Triggers: the db keys them by package checksum (Q1 + base64 sha1); the
+# scripts are named by the same hash in hex (X1...).
+while read -r q dirs; do
+	hex=$(printf '%s' "${q#Q1}" | base64 -d 2>/dev/null | od -An -tx1 | tr -d ' \n')
+	for s in "$work"/*.X1"$hex".trigger; do
+		[ -f "$s" ] || continue
+		chmod +x "$s"
+		# shellcheck disable=SC2086
+		set -- $(for d in $dirs; do for m in $d; do [ -d "$m" ] && echo "$m"; done; done)
+		"$s" "$@" || echo "firstboot: $s failed"
+	done
+done < /lib/apk/db/triggers
+
+# Owners that did not exist when the packages were unpacked.
+python3 /usr/sbin/haltia-fix-owners
+# Only the ADSP sensor PD is served: starting the root PD server together
+# with it early in the boot crashed the SoC into its dump mode.
+# haltia-firmware ran before the fastrpc user existed: hand the registry
+# output (only that) to it now.
+chown -R -h fastrpc:fastrpc /usr/share/qcom/sm6115/Lenovo/J606L/sensors/registry/registry 2>/dev/null
+
+# rmtfs serves the modem read-only copies of its EFS partitions, so the
+# stock modemst1, modemst2, fsg and fsc are never written.
+mkdir -p /var/lib/rmtfs
+for p in modemst1:modem_fs1 modemst2:modem_fs2 fsg:modem_fsg fsc:modem_fsc; do
+	for u in /sys/class/block/*/uevent; do
+		grep -qx "PARTNAME=${p%%:*}" "$u" &&
+			dd if="/dev/$(sed -n 's/^DEVNAME=//p' "$u")" of="/var/lib/rmtfs/${p#*:}" bs=64k
+	done
+done
+
+# The image is smaller than the partition: grow the root to fill it.
+for u in /sys/class/block/*/uevent; do
+	grep -qx PARTNAME=haltia "$u" && resize2fs "/dev/$(sed -n 's/^DEVNAME=//p' "$u")"
+done
+
+glib-compile-schemas /usr/share/glib-2.0/schemas
+gtk-update-icon-cache -q -f /usr/share/icons/hicolor 2>/dev/null
+gtk-update-icon-cache -q -f /usr/share/icons/Adwaita 2>/dev/null
+fc-cache -f 2>/dev/null
+depmod -a "$(uname -r)" 2>/dev/null
+
+for s in devfs dmesg sysfs udev udev-trigger udev-settle; do
+	rc-update add $s sysinit
+done
+# The PMIC RTC cannot be set: keep time across reboots from the shutdown
+# stamp (swclock) until ntpd has the network. Without it the clock starts
+# in 1970 and OpenRC skips services over the "skewed" dependency cache.
+for s in swclock modules sysctl hostname bootmisc syslog; do
+	rc-update add $s boot
+done
+# polkit is not among them: D-Bus starts it on the first request, and a
+# second copy from OpenRC loses the bus name and fails.
+for s in dbus elogind seatd tqftpserv rmtfs hexagonrpcd-adsp-sensorspd dbmd8 networkmanager bluetooth sshd ntpd iio-sensor-proxy earlyoom local; do
+	[ -e /etc/init.d/$s ] && rc-update add $s default
+done
+for s in mount-ro killprocs savecache; do
+	rc-update add $s shutdown
+done
+
+# The session user, as on the B8000-H: uid 1000, empty password, doas.
+id user >/dev/null 2>&1 || adduser -D -u 1000 -G wheel -h /home/user -s /bin/sh user
+for g in video seat input audio plugdev netdev; do
+	addgroup user "$g" 2>/dev/null
+done
+passwd -d user
+passwd -d root
+echo 'permit nopass :wheel' > /etc/doas.d/20-wheel.conf
+mkdir -p /etc/haltia
+echo user > /etc/haltia/session-user
+for d in Загрузки Документы Изображения Музыка Видео; do
+	install -d -m 755 -o 1000 -g 1000 "/home/user/$d"
+done
+
+rm -rf "$work"
+touch /var/lib/haltia/firstboot-done
+sync

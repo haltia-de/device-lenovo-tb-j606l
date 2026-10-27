@@ -1,0 +1,103 @@
+media: qcom: camss: Add SM6115.
+
+SM6115 has the CSIDs and TFEs of QCM2290 and a third CSIPHY at
+0x5c54000. The TB-J606L front camera sits on CSIPHY2.
+
+--- a/drivers/media/platform/qcom/camss/camss.c	2026-10-27 16:50:46.504325119 +0300
++++ b/drivers/media/platform/qcom/camss/camss.c	2026-10-27 16:50:46.515848593 +0300
+@@ -722,6 +722,68 @@
+ 	}
+ };
+ 
++/* SM6115 has the QCM2290 CSIDs and TFEs, and a third CSIPHY. */
++static const struct camss_subdev_resources csiphy_res_6115[] = {
++	/* CSIPHY0 */
++	{
++		.regulators = {
++			{ .supply = "vdd-csiphy-1p2", .init_load_uA = 26700 },
++			{ .supply = "vdd-csiphy-1p8", .init_load_uA = 2600 }
++		},
++		.clock = { "top_ahb", "ahb", "csiphy0", "csiphy0_timer" },
++		.clock_rate = { { 0 },
++				{ 0 },
++				{ 240000000, 341330000, 384000000 },
++				{ 100000000, 200000000, 268800000 }  },
++		.reg = { "csiphy0" },
++		.interrupt = { "csiphy0" },
++		.csiphy = {
++			.id = 0,
++			.hw_ops = &csiphy_ops_3ph_1_0,
++			.formats = &csiphy_formats_sdm845
++		}
++	},
++
++	/* CSIPHY1 */
++	{
++		.regulators = {
++			{ .supply = "vdd-csiphy-1p2", .init_load_uA = 26700 },
++			{ .supply = "vdd-csiphy-1p8", .init_load_uA = 2600 }
++		},
++		.clock = { "top_ahb", "ahb", "csiphy1", "csiphy1_timer" },
++		.clock_rate = { { 0 },
++				{ 0 },
++				{ 240000000, 341330000, 384000000 },
++				{ 100000000, 200000000, 268800000 }  },
++		.reg = { "csiphy1" },
++		.interrupt = { "csiphy1" },
++		.csiphy = {
++			.id = 1,
++			.hw_ops = &csiphy_ops_3ph_1_0,
++			.formats = &csiphy_formats_sdm845
++		}
++	},
++	/* CSIPHY2 */
++	{
++		.regulators = {
++			{ .supply = "vdd-csiphy-1p2", .init_load_uA = 26700 },
++			{ .supply = "vdd-csiphy-1p8", .init_load_uA = 2600 }
++		},
++		.clock = { "top_ahb", "ahb", "csiphy2", "csiphy2_timer" },
++		.clock_rate = { { 0 },
++				{ 0 },
++				{ 240000000, 341330000, 384000000 },
++				{ 100000000, 200000000, 268800000 }  },
++		.reg = { "csiphy2" },
++		.interrupt = { "csiphy2" },
++		.csiphy = {
++			.id = 2,
++			.hw_ops = &csiphy_ops_3ph_1_0,
++			.formats = &csiphy_formats_sdm845
++		}
++	}
++};
++
+ static const struct camss_subdev_resources csid_res_2290[] = {
+ 	/* CSID0 */
+ 	{
+@@ -5160,6 +5222,18 @@
+ 	.vfe_num = ARRAY_SIZE(vfe_res_2290),
+ };
+ 
++static const struct camss_resources sm6115_resources = {
++	.version = CAMSS_2290,
++	.csiphy_res = csiphy_res_6115,
++	.csid_res = csid_res_2290,
++	.vfe_res = vfe_res_2290,
++	.icc_res = icc_res_2290,
++	.icc_path_num = ARRAY_SIZE(icc_res_2290),
++	.csiphy_num = ARRAY_SIZE(csiphy_res_6115),
++	.csid_num = ARRAY_SIZE(csid_res_2290),
++	.vfe_num = ARRAY_SIZE(vfe_res_2290),
++};
++
+ static const struct camss_resources qcs8300_resources = {
+ 	.version = CAMSS_8300,
+ 	.pd_name = "top",
+@@ -5328,6 +5402,7 @@
+ 	{ .compatible = "qcom,sdm660-camss", .data = &sdm660_resources },
+ 	{ .compatible = "qcom,sdm670-camss", .data = &sdm670_resources },
+ 	{ .compatible = "qcom,sdm845-camss", .data = &sdm845_resources },
++	{ .compatible = "qcom,sm6115-camss", .data = &sm6115_resources },
+ 	{ .compatible = "qcom,sm6150-camss", .data = &sm6150_resources },
+ 	{ .compatible = "qcom,sm8250-camss", .data = &sm8250_resources },
+ 	{ .compatible = "qcom,sm8550-camss", .data = &sm8550_resources },

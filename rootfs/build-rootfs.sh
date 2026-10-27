@@ -1,0 +1,136 @@
+#!/bin/sh
+# Build the Pertin Haltia root filesystem for the TB-J606L (Alpine 3.24 aarch64).
+#
+# Runs on an x86 host inside alpine:3.24 without aarch64 emulation:
+#   docker run --rm -v $PWD:/src -v $WORK:/work alpine:3.24 sh /src/rootfs/build-rootfs.sh
+# Packages are unpacked with --no-scripts. Their scripts and triggers run on
+# the tablet at the first boot (haltia-firstboot), from the apk cache kept in
+# the image, so the first boot needs no network.
+#
+# Environment: ROOT (default /work/rootfs), KERNEL_TAR (modules tarball,
+# optional), IMAGE (default /work/haltia-root.ext4), IMAGE_MB (default 6144),
+# OVERLAY (optional: a tree copied over the root last, such as shell files
+# that are newer than the published packages).
+set -eu
+SRC=$(cd "$(dirname "$0")/.." && pwd)
+ROOT=${ROOT:-/work/rootfs}
+IMAGE=${IMAGE:-/work/haltia-root.ext4}
+IMAGE_MB=${IMAGE_MB:-6144}
+MIRROR=${MIRROR:-https://dl-cdn.alpinelinux.org/alpine/v3.24}
+HALTIA_REPO=${HALTIA_REPO:-https://haltia-de.github.io/packages/alpine/v3.24}
+
+apk add --no-cache e2fsprogs tar kmod >/dev/null
+
+PACKAGES="alpine-base openrc busybox-openrc busybox-binsh eudev udev-init-scripts udev-init-scripts-openrc
+	seatd seatd-openrc libinput dbus dbus-openrc elogind polkit polkit-elogind
+	phoc mesa-dri-gallium mesa-egl mesa-gbm
+	upower networkmanager networkmanager-openrc networkmanager-wifi networkmanager-cli
+	wpa_supplicant iw wireless-regdb
+	iio-sensor-proxy iio-sensor-proxy-openrc feedbackd feedbackd-device-themes
+	pulseaudio pulseaudio-alsa pulseaudio-utils alsa-plugins-pulse alsa-utils alsa-ucm-conf
+	firefox mobile-config-firefox foot grim fuzzel gtk-layer-shell mako
+	py3-gobject3 py3-pillow py3-cairo font-noto font-noto-emoji font-dejavu
+	adwaita-icon-theme gtk+3.0-lang desktop-file-utils tzdata xdg-utils
+	openssh openssh-server-pam doas earlyoom earlyoom-openrc
+	zstd qrtr rmtfs rmtfs-openrc tqftpserv tqftpserv-openrc linux-firmware-ath10k linux-firmware-qca bluez bluez-openrc bluez-btmgmt
+	hexagonrpcd hexagonrpcd-openrc libssc py3-libgpiod
+	libcamera libcamera-ipa libcamera-tools libcamera-gstreamer
+	bash htop nano e2fsprogs e2fsprogs-extra kmod util-linux python3
+	haltia-keys haltia-desktop haltia-music haltia-weather haltia-messenger
+	haltia-camera haltia-mail haltia-documents"
+
+rm -rf "$ROOT"
+mkdir -p "$ROOT/etc/apk/keys" "$ROOT/etc/apk/cache"
+printf '%s/main\n%s/community\n%s\n' "$MIRROR" "$MIRROR" "$HALTIA_REPO" > "$ROOT/etc/apk/repositories"
+cp /usr/share/apk/keys/aarch64/* "$ROOT/etc/apk/keys/"
+cp "$SRC"/rootfs/apk-keys/*.rsa.pub "$ROOT/etc/apk/keys/"
+# shellcheck disable=SC2086
+apk --root "$ROOT" --arch aarch64 --initdb --update-cache --no-scripts \
+	--cache-dir "$ROOT/etc/apk/cache" add $PACKAGES
+
+# busybox --install cannot run here. Alpine builds one busybox config for
+# every architecture, so the host's applet list matches the tablet's.
+busybox --list-full | while read -r applet; do
+	[ -e "$ROOT/$applet" ] || [ -L "$ROOT/$applet" ] || {
+		mkdir -p "$ROOT/$(dirname "$applet")"
+		ln -s /bin/busybox "$ROOT/$applet"
+	}
+done
+
+echo j606l > "$ROOT/etc/hostname"
+ln -sf /usr/share/zoneinfo/Europe/Moscow "$ROOT/etc/localtime"
+cat > "$ROOT/etc/fstab" <<'EOF'
+PARTLABEL=haltia	/	ext4	rw,noatime	0 1
+EOF
+
+install -D -m 755 "$SRC/rootfs/haltia-firstboot" "$ROOT/sbin/haltia-firstboot"
+install -D -m 755 "$SRC/rootfs/haltia-init" "$ROOT/sbin/haltia-init"
+install -D -m 644 "$SRC/rootfs/phoc.ini" "$ROOT/etc/haltia/phoc.ini"
+install -D -m 644 "$SRC/rootfs/networkmanager-usb0.conf" "$ROOT/etc/NetworkManager/conf.d/haltia-usb0.conf"
+install -D -m 644 "$SRC/rootfs/networkmanager-wifi-mac.conf" "$ROOT/etc/NetworkManager/conf.d/haltia-wifi-mac.conf"
+install -D -m 755 "$SRC/rootfs/haltia-fix-owners" "$ROOT/usr/sbin/haltia-fix-owners"
+install -D -m 644 "$SRC/rootfs/rmtfs.confd" "$ROOT/etc/conf.d/rmtfs"
+install -D -m 644 "$SRC/rootfs/modules-load.conf" "$ROOT/etc/modules-load.d/haltia-j606l.conf"
+install -D -m 755 "$SRC/rootfs/haltia-firmware" "$ROOT/usr/sbin/haltia-firmware"
+install -D -m 755 "$SRC/rootfs/haltia-lpdump" "$ROOT/usr/sbin/haltia-lpdump"
+install -D -m 755 "$SRC/rootfs/haltia-boot" "$ROOT/usr/sbin/haltia-boot"
+install -D -m 755 "$SRC/rootfs/haltia-reboot-android" "$ROOT/usr/sbin/haltia-reboot-android"
+install -D -m 644 "$SRC/rootfs/android.desktop" "$ROOT/usr/share/applications/haltia-android.desktop"
+install -D -m 644 "$SRC/rootfs/elogind-lid.conf" "$ROOT/etc/elogind/logind.conf.d/haltia-j606l.conf"
+install -D -m 644 "$SRC/rootfs/elogind-sleep.conf" "$ROOT/etc/elogind/sleep.conf.d/haltia-j606l.conf"
+# Speakers: UCM for the "Lenovo-TB-J606L" card (driver sm4250).
+install -D -m 644 "$SRC/rootfs/ucm/Lenovo-TB-J606L.conf" "$ROOT/usr/share/alsa/ucm2/conf.d/sm4250/Lenovo-TB-J606L.conf"
+install -D -m 644 "$SRC/rootfs/ucm/HiFi.conf" "$ROOT/usr/share/alsa/ucm2/Lenovo/TB-J606L/HiFi.conf"
+install -D -m 644 "$SRC/rootfs/91-fastrpc.rules" "$ROOT/etc/udev/rules.d/91-fastrpc.rules"
+install -D -m 644 "$SRC/rootfs/81-j606l-sensors.rules" "$ROOT/etc/udev/rules.d/81-j606l-sensors.rules"
+install -D -m 644 "$SRC/rootfs/82-j606l-battery.rules" "$ROOT/etc/udev/rules.d/82-j606l-battery.rules"
+install -D -m 644 "$SRC/rootfs/83-j606l-bt-wake.rules" "$ROOT/etc/udev/rules.d/83-j606l-bt-wake.rules"
+install -D -m 644 "$SRC/rootfs/84-j606l-camera.rules" "$ROOT/etc/udev/rules.d/84-j606l-camera.rules"
+for s in hexagonrpcd-adsp-rootpd hexagonrpcd-adsp-sensorspd; do
+	install -D -m 644 "$SRC/rootfs/hexagonrpcd.confd" "$ROOT/etc/conf.d/$s"
+done
+install -D -m 644 "$SRC/rootfs/iio-sensor-proxy.confd" "$ROOT/etc/conf.d/iio-sensor-proxy"
+install -D -m 644 "$SRC/rootfs/50-haltia-j606l-sensors.rules" "$ROOT/etc/polkit-1/rules.d/50-haltia-j606l-sensors.rules"
+install -D -m 644 "$SRC/rootfs/device.conf" "$ROOT/etc/haltia/device.conf"
+install -D -m 755 "$SRC/rootfs/bt-address.start" "$ROOT/etc/local.d/10-bt-address.start"
+install -D -m 755 "$SRC/rootfs/haltia-dbmd8" "$ROOT/usr/sbin/haltia-dbmd8"
+install -D -m 755 "$SRC/rootfs/haltia-suspend" "$ROOT/usr/lib/haltia/hooks/suspend"
+install -D -m 755 "$SRC/rootfs/dbmd8.initd" "$ROOT/etc/init.d/dbmd8"
+install -D -m 755 "$SRC/rootfs/desktop.start" "$ROOT/etc/local.d/desktop.start"
+mkdir -p "$ROOT/etc/haltia"
+echo "$PACKAGES" | tr -s ' \t\n' '\n' | sed '/^$/d' > "$ROOT/etc/haltia/firstboot.packages"
+mkdir -p "$ROOT/var/lib/haltia"
+# DEBUG=1 adds a passwordless USB root shell for development.
+if [ "${DEBUG:-0}" = 1 ]; then
+	touch "$ROOT/etc/haltia/debug-shell"
+	# SSH_KEY: a public key for root over the USB network (10.15.0.2).
+	if [ -n "${SSH_KEY:-}" ]; then
+		install -d -m 700 "$ROOT/root/.ssh"
+		echo "$SSH_KEY" > "$ROOT/root/.ssh/authorized_keys"
+		chmod 600 "$ROOT/root/.ssh/authorized_keys"
+	fi
+fi
+
+if [ -n "${KERNEL_TAR:-}" ]; then
+	tar -C "$ROOT" -xf "$KERNEL_TAR"
+	# udev loads drivers from the first boot on, before haltia-firstboot.
+	for k in "$ROOT"/lib/modules/*/; do
+		depmod -b "$ROOT" "$(basename "$k")"
+	done
+fi
+if [ -d "${FIRMWARE:-/nonexistent}" ]; then
+	mkdir -p "$ROOT/lib/firmware"
+	cp -a "$FIRMWARE"/. "$ROOT/lib/firmware/"
+fi
+
+if [ -d "${OVERLAY:-/nonexistent}" ]; then
+	cp -a "$OVERLAY"/. "$ROOT/"
+	# Owned by root, whoever owns the tree on the host.
+	(cd "$OVERLAY" && find . -mindepth 1) | while read -r f; do
+		chown -h 0:0 "$ROOT/$f"
+	done
+fi
+
+rm -f "$IMAGE"
+mkfs.ext4 -q -L haltia -b 4096 -d "$ROOT" "$IMAGE" "${IMAGE_MB}M"
+ls -la "$IMAGE"

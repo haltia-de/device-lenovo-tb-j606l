@@ -1,0 +1,132 @@
+--- /dev/null
++++ b/drivers/video/backlight/sgm37604a.c
+@@ -0,0 +1,106 @@
++// SPDX-License-Identifier: GPL-2.0-only
++/*
++ * SG Micro SGM37604A LED backlight driver (brightness only).
++ *
++ * The bootloader programs the LED strings, current and mode; this driver
++ * keeps them and only sets the 12-bit brightness: LSB register 0x1A holds
++ * bits 3:0, MSB register 0x19 bits 11:4.
++ */
++#include <linux/backlight.h>
++#include <linux/gpio/consumer.h>
++#include <linux/i2c.h>
++#include <linux/mod_devicetable.h>
++#include <linux/module.h>
++
++#define SGM37604A_BRIGHTNESS_MSB	0x19
++#define SGM37604A_BRIGHTNESS_LSB	0x1a
++#define SGM37604A_MAX_BRIGHTNESS	4095
++
++struct sgm37604a {
++	struct i2c_client *client;
++	struct gpio_desc *enable;
++};
++
++static int sgm37604a_write(struct sgm37604a *chip, unsigned int level)
++{
++	int ret;
++
++	ret = i2c_smbus_write_byte_data(chip->client, SGM37604A_BRIGHTNESS_LSB, level & 0x0f);
++	if (ret)
++		return ret;
++	return i2c_smbus_write_byte_data(chip->client, SGM37604A_BRIGHTNESS_MSB, level >> 4);
++}
++
++static int sgm37604a_update_status(struct backlight_device *bl)
++{
++	struct sgm37604a *chip = bl_get_data(bl);
++
++	return sgm37604a_write(chip, backlight_get_brightness(bl));
++}
++
++static const struct backlight_ops sgm37604a_ops = {
++	.options = BL_CORE_SUSPENDRESUME,
++	.update_status = sgm37604a_update_status,
++};
++
++static int sgm37604a_probe(struct i2c_client *client)
++{
++	struct device *dev = &client->dev;
++	struct backlight_properties props = {
++		.type = BACKLIGHT_RAW,
++		.max_brightness = SGM37604A_MAX_BRIGHTNESS,
++		.scale = BACKLIGHT_SCALE_LINEAR,
++	};
++	struct backlight_device *bl;
++	struct sgm37604a *chip;
++	int msb, lsb;
++
++	chip = devm_kzalloc(dev, sizeof(*chip), GFP_KERNEL);
++	if (!chip)
++		return -ENOMEM;
++	chip->client = client;
++
++	/* Leave the enable line as the bootloader set it (on). */
++	chip->enable = devm_gpiod_get_optional(dev, "enable", GPIOD_ASIS);
++	if (IS_ERR(chip->enable))
++		return dev_err_probe(dev, PTR_ERR(chip->enable), "enable gpio\n");
++
++	msb = i2c_smbus_read_byte_data(client, SGM37604A_BRIGHTNESS_MSB);
++	lsb = i2c_smbus_read_byte_data(client, SGM37604A_BRIGHTNESS_LSB);
++	if (msb < 0 || lsb < 0)
++		return dev_err_probe(dev, msb < 0 ? msb : lsb, "no response\n");
++	props.brightness = (msb << 4) | (lsb & 0x0f);
++
++	bl = devm_backlight_device_register(dev, "sgm37604a", dev, chip,
++					    &sgm37604a_ops, &props);
++	if (IS_ERR(bl))
++		return dev_err_probe(dev, PTR_ERR(bl), "backlight register\n");
++
++	i2c_set_clientdata(client, bl);
++	return 0;
++}
++
++static const struct of_device_id sgm37604a_of_match[] = {
++	{ .compatible = "sgmicro,sgm37604a" },
++	{ }
++};
++MODULE_DEVICE_TABLE(of, sgm37604a_of_match);
++
++static const struct i2c_device_id sgm37604a_id[] = {
++	{ "sgm37604a" },
++	{ }
++};
++MODULE_DEVICE_TABLE(i2c, sgm37604a_id);
++
++static struct i2c_driver sgm37604a_driver = {
++	.driver = {
++		.name = "sgm37604a",
++		.of_match_table = sgm37604a_of_match,
++	},
++	.probe = sgm37604a_probe,
++	.id_table = sgm37604a_id,
++};
++module_i2c_driver(sgm37604a_driver);
++
++MODULE_DESCRIPTION("SG Micro SGM37604A backlight driver");
++MODULE_LICENSE("GPL");
+--- a/drivers/video/backlight/Kconfig
++++ b/drivers/video/backlight/Kconfig
+@@ -336,6 +336,13 @@
+ 	  It's commonly used to drive the display WLED. There're four channels
+ 	  inisde, and each channel can provide up to 30mA current.
+ 
++config BACKLIGHT_SGM37604A
++	tristate "SG Micro SGM37604A backlight"
++	depends on I2C
++	help
++	  Brightness control for the SG Micro SGM37604A LED backlight driver,
++	  as found in the Lenovo Tab P11.
++
+ config BACKLIGHT_SAHARA
+ 	tristate "Tabletkiosk Sahara Touch-iT Backlight Driver"
+ 	depends on X86
+--- a/drivers/video/backlight/Makefile
++++ b/drivers/video/backlight/Makefile
+@@ -62,3 +62,4 @@
+ obj-$(CONFIG_BACKLIGHT_ARCXCNN) 	+= arcxcnn_bl.o
+ obj-$(CONFIG_BACKLIGHT_RAVE_SP)		+= rave-sp-backlight.o
+ obj-$(CONFIG_BACKLIGHT_LED)		+= led_bl.o
++obj-$(CONFIG_BACKLIGHT_SGM37604A)	+= sgm37604a.o

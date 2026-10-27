@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Android
+Name[ru]=Android
+Comment[ru]=Перезагрузить планшет в Android
+Exec=doas -n /usr/sbin/haltia-reboot-android
+Icon=system-reboot
+Categories=System;

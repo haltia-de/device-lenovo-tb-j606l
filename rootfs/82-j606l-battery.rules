@@ -1,0 +1,6 @@
+# The MM8013 fuel gauge sends no event when the charger comes or goes, so
+# UPower would see the new status only at its next poll. The USB-C port's
+# supply does send one; a moment later the gauge has the new status, so
+# announce a change of the battery then.
+ACTION=="change", SUBSYSTEM=="power_supply", KERNEL=="tcpm-source-psy-*", \
+	RUN+="/bin/sh -c 'sleep 2; echo change > /sys/class/power_supply/mm8013/uevent'"

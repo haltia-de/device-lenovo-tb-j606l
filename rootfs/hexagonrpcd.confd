@@ -1,0 +1,2 @@
+# Files the ADSP root and sensor PDs read, copied by haltia-firmware.
+hexagonrpcd_fw_dir="/usr/share/qcom/sm6115/Lenovo/J606L"

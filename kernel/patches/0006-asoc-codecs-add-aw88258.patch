@@ -1,0 +1,438 @@
+--- /dev/null
++++ b/sound/soc/codecs/aw88258.c
+@@ -0,0 +1,401 @@
++// SPDX-License-Identifier: GPL-2.0-only
++/*
++ * Awinic AW88258 smart power amplifier, as used four times in the Lenovo
++ * Tab P11 (TB-J606L).
++ *
++ * The register setup comes from the vendor ACF file (awinic/aw882xx_acf.bin):
++ * one section per amplifier ("awinic,channel" picks it) with a register list
++ * per profile; this driver loads the "music" profile. Smart-boost
++ * calibration and the vendor DSP hooks are not supported.
++ *
++ * Register layout and the ACF format follow Awinic's GPL aw882xx driver
++ * shipped in Lenovo's TB-J606L kernel sources.
++ */
++#include <linux/bitfield.h>
++#include <linux/delay.h>
++#include <linux/firmware.h>
++#include <linux/gpio/consumer.h>
++#include <linux/i2c.h>
++#include <linux/module.h>
++#include <linux/regmap.h>
++#include <sound/pcm_params.h>
++#include <sound/soc.h>
++
++#define AW88258_ID		0x00
++#define AW88258_SYSST		0x01
++#define AW88258_SYSINT		0x02
++#define AW88258_SYSINTM		0x03
++#define AW88258_SYSCTRL		0x04
++#define AW88258_SYSCTRL2	0x05
++#define AW88258_I2SCTRL		0x06
++#define AW88258_I2SCFG1		0x07
++#define AW88258_HAGCCFG4	0x0c
++#define AW88258_MAX_REG		0x7f
++
++#define AW88258_CHIP_ID		0x1852
++
++#define AW88258_PWDN		BIT(0)		/* SYSCTRL */
++#define AW88258_HMUTE		BIT(4)		/* SYSCTRL2 */
++#define AW88258_I2SMD		GENMASK(9, 8)	/* I2SCTRL */
++#define AW88258_I2SFS		GENMASK(7, 6)
++#define AW88258_I2SBCK		GENMASK(5, 4)
++#define AW88258_I2SSR		GENMASK(3, 0)
++#define AW88258_RX_SLOTVLD	GENMASK(11, 8)	/* I2SCFG1 */
++#define AW88258_FSYNC_TYPE	BIT(3)
++#define AW88258_SLOT_NUM	BIT(2)
++
++#define AW88258_SYSST_PLLS	BIT(0)
++#define AW88258_SYSST_CLKS	BIT(4)
++
++#define AW88258_ACF_FILE	"awinic/aw882xx_acf.bin"
++#define AW88258_ACF_ID		0x0a15f908
++#define AW88258_SEC_DEVICE	1
++#define AW88258_PROFILE_MUSIC	0
++
++struct aw88258_acf_hdr {
++	__le32 id;
++	char project[24];
++	char custom[16];
++	u8 version[4];
++	__le32 author_id;
++	__le32 entry_size;
++	__le32 entry_num;
++	__le32 sh_offset;
++	__le32 reserve[4];
++} __packed;
++
++struct aw88258_acf_shdr {
++	__le32 type;
++	__le32 offset;
++	__le32 size;
++	__le32 info[3];	/* device: index, profile count; register: profile id */
++} __packed;
++
++struct aw88258 {
++	struct device *dev;
++	struct regmap *regmap;
++	struct gpio_desc *reset;
++	u32 channel;
++	u16 *regs;	/* address, value pairs of the music profile */
++	unsigned int nregs;
++	bool started;
++};
++
++static const struct regmap_config aw88258_regmap = {
++	.reg_bits = 8,
++	.val_bits = 16,
++	.max_register = AW88258_MAX_REG,
++	.cache_type = REGCACHE_NONE,
++};
++
++/* Pick this amplifier's music profile out of the ACF file. */
++static int aw88258_parse_acf(struct aw88258 *aw, const struct firmware *fw)
++{
++	const struct aw88258_acf_hdr *hdr = (const void *)fw->data;
++	const struct aw88258_acf_shdr *sec, *sub;
++	u32 n, off, i, j;
++
++	if (fw->size < sizeof(*hdr) || le32_to_cpu(hdr->id) != AW88258_ACF_ID ||
++	    le32_to_cpu(hdr->entry_size) != sizeof(*sec))
++		return -EINVAL;
++	n = le32_to_cpu(hdr->entry_num);
++	off = le32_to_cpu(hdr->sh_offset);
++	if (off > fw->size || n > (fw->size - off) / sizeof(*sec))
++		return -EINVAL;
++	sec = (const void *)(fw->data + off);
++
++	for (i = 0; i < n; i++) {
++		u32 base = le32_to_cpu(sec[i].offset);
++		u32 profiles = le32_to_cpu(sec[i].info[1]);
++
++		if (le32_to_cpu(sec[i].type) != AW88258_SEC_DEVICE ||
++		    le32_to_cpu(sec[i].info[0]) != aw->channel)
++			continue;
++		if (base > fw->size || profiles > (fw->size - base) / sizeof(*sub))
++			return -EINVAL;
++		sub = (const void *)(fw->data + base);
++		for (j = 0; j < profiles; j++) {
++			u32 o = base + le32_to_cpu(sub[j].offset);
++			u32 size = le32_to_cpu(sub[j].size);
++			const u8 *p = fw->data + o;
++			unsigned int k;
++
++			if (le32_to_cpu(sub[j].info[0]) != AW88258_PROFILE_MUSIC)
++				continue;
++			if (o > fw->size || size > fw->size - o || size % 4)
++				return -EINVAL;
++			aw->regs = devm_kcalloc(aw->dev, size / 2, sizeof(u16), GFP_KERNEL);
++			if (!aw->regs)
++				return -ENOMEM;
++			for (k = 0; k < size / 2; k++)
++				aw->regs[k] = p[2 * k] | (p[2 * k + 1] << 8);
++			aw->nregs = size / 4;
++			return 0;
++		}
++	}
++	return -ENOENT;
++}
++
++/* Write the profile, but keep the amplifier powered down and muted. */
++static int aw88258_load_profile(struct aw88258 *aw)
++{
++	unsigned int i;
++	int ret;
++
++	for (i = 0; i < aw->nregs; i++) {
++		unsigned int reg = aw->regs[2 * i], val = aw->regs[2 * i + 1];
++
++		if (reg == AW88258_I2SCTRL)	/* standard I2S, as the LPASS MI2S port sends */
++			val &= ~AW88258_I2SMD;
++		/*
++		 * The stock profile sets up a four-slot TDM frame (slots 0-1 for
++		 * channels 0-1, 2-3 for 2-3). The MI2S port sends a two-slot I2S
++		 * frame, so every amplifier takes slots 0-1 and picks left or
++		 * right with CHSEL: the left speakers play left, the right ones
++		 * right.
++		 */
++		if (reg == AW88258_I2SCFG1)
++			val = (val & ~(AW88258_RX_SLOTVLD | AW88258_FSYNC_TYPE | AW88258_SLOT_NUM)) |
++			      FIELD_PREP(AW88258_RX_SLOTVLD, 0x3);
++		if (reg == AW88258_SYSCTRL)
++			val |= AW88258_PWDN;
++		else if (reg == AW88258_SYSCTRL2)
++			val |= AW88258_HMUTE;
++		ret = regmap_write(aw->regmap, reg, val);
++		if (ret)
++			return ret;
++	}
++	return 0;
++}
++
++static int aw88258_start(struct aw88258 *aw)
++{
++	unsigned int st;
++	int i, ret;
++
++	ret = regmap_update_bits(aw->regmap, AW88258_SYSCTRL, AW88258_PWDN, 0);
++	if (ret)
++		return ret;
++	/* The PLL locks once BCLK and LRCLK run. */
++	for (i = 0; i < 20; i++) {
++		regmap_read(aw->regmap, AW88258_SYSST, &st);
++		if ((st & (AW88258_SYSST_PLLS | AW88258_SYSST_CLKS)) ==
++		    (AW88258_SYSST_PLLS | AW88258_SYSST_CLKS))
++			break;
++		usleep_range(2000, 2500);
++	}
++	if (i == 20) {
++		dev_warn(aw->dev, "no lock on the I2S clocks (sysst 0x%04x)\n", st);
++		regmap_update_bits(aw->regmap, AW88258_SYSCTRL, AW88258_PWDN, AW88258_PWDN);
++		return -EIO;
++	}
++	regmap_read(aw->regmap, AW88258_SYSINT, &st);	/* clear */
++	ret = regmap_update_bits(aw->regmap, AW88258_SYSCTRL2, AW88258_HMUTE, 0);
++	aw->started = !ret;
++	return ret;
++}
++
++static void aw88258_stop(struct aw88258 *aw)
++{
++	regmap_update_bits(aw->regmap, AW88258_SYSCTRL2, AW88258_HMUTE, AW88258_HMUTE);
++	regmap_update_bits(aw->regmap, AW88258_SYSCTRL, AW88258_PWDN, AW88258_PWDN);
++	aw->started = false;
++}
++
++static int aw88258_set_fmt(struct snd_soc_dai *dai, unsigned int fmt)
++{
++	struct aw88258 *aw = snd_soc_component_get_drvdata(dai->component);
++	unsigned int md;
++
++	switch (fmt & SND_SOC_DAIFMT_FORMAT_MASK) {
++	case SND_SOC_DAIFMT_I2S:
++		md = 0;
++		break;
++	case SND_SOC_DAIFMT_LEFT_J:
++		md = 1;
++		break;
++	case SND_SOC_DAIFMT_RIGHT_J:
++		md = 2;
++		break;
++	default:
++		return -EINVAL;
++	}
++	return regmap_update_bits(aw->regmap, AW88258_I2SCTRL, AW88258_I2SMD,
++				  FIELD_PREP(AW88258_I2SMD, md));
++}
++
++static int aw88258_hw_params(struct snd_pcm_substream *substream,
++			     struct snd_pcm_hw_params *params,
++			     struct snd_soc_dai *dai)
++{
++	static const unsigned int rates[] = {
++		8000, 11025, 12000, 16000, 22050, 24000, 32000, 44100, 48000, 96000, 192000,
++	};
++	struct aw88258 *aw = snd_soc_component_get_drvdata(dai->component);
++	unsigned int sr, fs, bck, width = params_physical_width(params);
++
++	for (sr = 0; sr < ARRAY_SIZE(rates); sr++)
++		if (rates[sr] == params_rate(params))
++			break;
++	if (sr == ARRAY_SIZE(rates))
++		return -EINVAL;
++
++	switch (width) {
++	case 16:
++		fs = 0;
++		bck = 0;	/* 32 fs */
++		break;
++	case 24:
++		fs = 2;
++		bck = 1;	/* 48 fs */
++		break;
++	case 32:
++		fs = params_width(params) == 24 ? 2 : 3;
++		bck = 2;	/* 64 fs */
++		break;
++	default:
++		return -EINVAL;
++	}
++
++	return regmap_update_bits(aw->regmap, AW88258_I2SCTRL,
++				  AW88258_I2SFS | AW88258_I2SBCK | AW88258_I2SSR,
++				  FIELD_PREP(AW88258_I2SFS, fs) |
++				  FIELD_PREP(AW88258_I2SBCK, bck) |
++				  FIELD_PREP(AW88258_I2SSR, sr));
++}
++
++static int aw88258_mute_stream(struct snd_soc_dai *dai, int mute, int stream)
++{
++	struct aw88258 *aw = snd_soc_component_get_drvdata(dai->component);
++
++	if (!aw->nregs)
++		return 0;
++	if (mute) {
++		aw88258_stop(aw);
++		return 0;
++	}
++	return aw->started ? 0 : aw88258_start(aw);
++}
++
++static int aw88258_startup(struct snd_pcm_substream *substream, struct snd_soc_dai *dai)
++{
++	struct aw88258 *aw = snd_soc_component_get_drvdata(dai->component);
++
++	if (!aw->nregs) {
++		dev_warn(aw->dev, "no profile loaded; the amplifier stays off\n");
++		return 0;
++	}
++	return aw88258_load_profile(aw);
++}
++
++static const struct snd_soc_dai_ops aw88258_dai_ops = {
++	.startup = aw88258_startup,
++	.set_fmt = aw88258_set_fmt,
++	.hw_params = aw88258_hw_params,
++	.mute_stream = aw88258_mute_stream,
++	.no_capture_mute = 1,
++};
++
++static struct snd_soc_dai_driver aw88258_dai = {
++	.name = "aw88258-aif",
++	.playback = {
++		.stream_name = "Speaker Playback",
++		.channels_min = 1,
++		.channels_max = 2,
++		.rates = SNDRV_PCM_RATE_8000_192000,
++		.formats = SNDRV_PCM_FMTBIT_S16_LE | SNDRV_PCM_FMTBIT_S24_LE |
++			   SNDRV_PCM_FMTBIT_S32_LE,
++	},
++	.ops = &aw88258_dai_ops,
++};
++
++static const struct snd_soc_dapm_widget aw88258_widgets[] = {
++	SND_SOC_DAPM_OUTPUT("SPK"),
++};
++
++static const struct snd_soc_dapm_route aw88258_routes[] = {
++	{ "SPK", NULL, "Speaker Playback" },
++};
++
++static const struct snd_soc_component_driver aw88258_component = {
++	.dapm_widgets = aw88258_widgets,
++	.num_dapm_widgets = ARRAY_SIZE(aw88258_widgets),
++	.dapm_routes = aw88258_routes,
++	.num_dapm_routes = ARRAY_SIZE(aw88258_routes),
++	.endianness = 1,
++};
++
++static int aw88258_probe(struct i2c_client *client)
++{
++	struct device *dev = &client->dev;
++	const struct firmware *fw;
++	struct aw88258 *aw;
++	unsigned int id;
++	int ret;
++
++	aw = devm_kzalloc(dev, sizeof(*aw), GFP_KERNEL);
++	if (!aw)
++		return -ENOMEM;
++	aw->dev = dev;
++	i2c_set_clientdata(client, aw);
++
++	if (device_property_read_u32(dev, "awinic,channel", &aw->channel))
++		return dev_err_probe(dev, -EINVAL, "awinic,channel missing\n");
++
++	/* The four amplifiers of the J606L share one reset line. */
++	aw->reset = devm_gpiod_get_optional(dev, "reset",
++					    GPIOD_OUT_LOW | GPIOD_FLAGS_BIT_NONEXCLUSIVE);
++	if (IS_ERR(aw->reset))
++		return dev_err_probe(dev, PTR_ERR(aw->reset), "reset gpio\n");
++	usleep_range(2000, 2500);
++
++	aw->regmap = devm_regmap_init_i2c(client, &aw88258_regmap);
++	if (IS_ERR(aw->regmap))
++		return PTR_ERR(aw->regmap);
++
++	ret = regmap_read(aw->regmap, AW88258_ID, &id);
++	if (ret)
++		return dev_err_probe(dev, ret, "no answer\n");
++	if (id != AW88258_CHIP_ID)
++		return dev_err_probe(dev, -ENODEV, "chip id 0x%04x is not an AW88258\n", id);
++
++	ret = request_firmware(&fw, AW88258_ACF_FILE, dev);
++	if (ret) {
++		dev_warn(dev, "%s: %d; no sound from this amplifier\n", AW88258_ACF_FILE, ret);
++	} else {
++		ret = aw88258_parse_acf(aw, fw);
++		release_firmware(fw);
++		if (ret)
++			dev_warn(dev, "no music profile for channel %u: %d\n", aw->channel, ret);
++	}
++	/* Power down and mute until a stream starts. */
++	regmap_update_bits(aw->regmap, AW88258_SYSCTRL, AW88258_PWDN, AW88258_PWDN);
++	regmap_update_bits(aw->regmap, AW88258_SYSCTRL2, AW88258_HMUTE, AW88258_HMUTE);
++
++	return devm_snd_soc_register_component(dev, &aw88258_component, &aw88258_dai, 1);
++}
++
++static const struct of_device_id aw88258_of_match[] = {
++	{ .compatible = "awinic,aw88258" },
++	{ }
++};
++MODULE_DEVICE_TABLE(of, aw88258_of_match);
++
++static const struct i2c_device_id aw88258_id[] = {
++	{ "aw88258" },
++	{ }
++};
++MODULE_DEVICE_TABLE(i2c, aw88258_id);
++
++static struct i2c_driver aw88258_driver = {
++	.driver = {
++		.name = "aw88258",
++		.of_match_table = aw88258_of_match,
++	},
++	.probe = aw88258_probe,
++	.id_table = aw88258_id,
++};
++module_i2c_driver(aw88258_driver);
++
++MODULE_DESCRIPTION("Awinic AW88258 smart amplifier driver");
++MODULE_LICENSE("GPL");
+--- a/sound/soc/codecs/Kconfig
++++ b/sound/soc/codecs/Kconfig
+@@ -687,6 +687,13 @@
+ 	  digital Smart K audio amplifier with sound quality
+ 	  enhancement algorithms and speaker protection.
+ 
++config SND_SOC_AW88258
++	tristate "Awinic AW88258 smart amplifier"
++	depends on I2C
++	select REGMAP_I2C
++	help
++	  The Awinic AW88258 smart power amplifier, as in the Lenovo Tab P11.
++
+ config SND_SOC_AW88261
+ 	tristate "Soc Audio for awinic aw88261"
+ 	depends on I2C
+--- a/sound/soc/codecs/Makefile
++++ b/sound/soc/codecs/Makefile
+@@ -53,6 +53,7 @@
+ 			aw88395/aw88395_device.o
+ snd-soc-aw88395-y := aw88395/aw88395.o
+ snd-soc-aw88166-y := aw88166.o
++snd-soc-aw88258-y := aw88258.o
+ snd-soc-aw88261-y := aw88261.o
+ snd-soc-aw88399-y := aw88399.o
+ snd-soc-bd28623-y := bd28623.o
+@@ -490,6 +491,7 @@
+ obj-$(CONFIG_SND_SOC_AW88395_LIB) += snd-soc-aw88395-lib.o
+ obj-$(CONFIG_SND_SOC_AW88395)	+=snd-soc-aw88395.o
+ obj-$(CONFIG_SND_SOC_AW88166)	+=snd-soc-aw88166.o
++obj-$(CONFIG_SND_SOC_AW88258)	+= snd-soc-aw88258.o
+ obj-$(CONFIG_SND_SOC_AW88261)	+=snd-soc-aw88261.o
+ obj-$(CONFIG_SND_SOC_AW88399)	+= snd-soc-aw88399.o
+ obj-$(CONFIG_SND_SOC_BD28623)	+= snd-soc-bd28623.o

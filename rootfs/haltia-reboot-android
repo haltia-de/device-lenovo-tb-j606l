@@ -1,0 +1,3 @@
+#!/bin/sh
+# Reboot the TB-J606L into Android (slot B, normal boot).
+/usr/sbin/haltia-boot android && sync && reboot

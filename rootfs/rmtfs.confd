@@ -1,0 +1,3 @@
+# Read-only copies of the EFS partitions (haltia-firstboot makes them).
+rmtfs_files_path="/var/lib/rmtfs"
+rmtfs_avoid_writing="true"

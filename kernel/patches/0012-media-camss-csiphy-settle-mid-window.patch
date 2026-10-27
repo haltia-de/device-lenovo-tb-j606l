@@ -1,0 +1,19 @@
+media: qcom: camss: Settle in the middle of the D-PHY window.
+
+The settle count waited only for the minimum T_HS-SETTLE, 85 ns + 6 UI.
+With the OV8856 at 180 MHz (its 1640x1232 modes) on SM6115 the CSID
+then counted CRC and ECC errors on every packet and no frame arrived.
+The middle of the window, 115 ns + 8 UI, works at 180 and 360 MHz.
+
+--- a/drivers/media/platform/qcom/camss/camss-csiphy-3ph-1-0.c	2026-10-27 17:41:21.602389960 +0300
++++ b/drivers/media/platform/qcom/camss/camss-csiphy-3ph-1-0.c	2026-10-27 17:41:21.614315669 +0300
+@@ -894,7 +894,8 @@
+ 	ui = div_u64(1000000000000LL, link_freq);
+ 	ui /= 2;
+ 	t_hs_prepare_max = 85000 + 6 * ui;
+-	t_hs_settle = t_hs_prepare_max;
++	/* The middle of the D-PHY window, 85 ns + 6 UI to 145 ns + 10 UI. */
++	t_hs_settle = 115000 + 8 * ui;
+ 
+ 	timer_period = div_u64(1000000000000LL, timer_clk_rate);
+ 	settle_cnt = t_hs_settle / timer_period - 6;

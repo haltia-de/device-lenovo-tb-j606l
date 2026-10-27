@@ -1,0 +1,26 @@
+drm/panel: nt36523: Remove the panel when DSI attach fails.
+
+The probe added the panel and returned on a failed DSI attach without
+removing it. The panel lives in devm memory, so it was freed while still
+in the panel list; the touch driver then found it as its panel to
+follow, and its unwind oopsed in drm_panel_remove_follower (issue #24).
+
+--- a/drivers/gpu/drm/panel/panel-novatek-nt36523.c
++++ b/drivers/gpu/drm/panel/panel-novatek-nt36523.c
+@@ -1250,8 +1250,15 @@
+ 		pinfo->dsi[i]->mode_flags = pinfo->desc->mode_flags;
+ 
+ 		ret = devm_mipi_dsi_attach(dev, pinfo->dsi[i]);
+-		if (ret < 0)
++		if (ret < 0) {
++			/*
++			 * The panel is freed with the device's resources:
++			 * leaving it listed let a follower (the touch screen)
++			 * find it and use freed memory.
++			 */
++			drm_panel_remove(&pinfo->panel);
+ 			return dev_err_probe(dev, ret, "cannot attach to DSI%d host.\n", i);
++		}
+ 	}
+ 
+ 	return 0;

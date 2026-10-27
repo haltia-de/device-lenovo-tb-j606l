@@ -1,0 +1,17 @@
+#!/sbin/openrc-run
+# The DBMD8 voice processor in front of the microphones (haltia-dbmd8).
+description="Start the DBMD8 voice processor for the microphones"
+supervisor=supervise-daemon
+command=/usr/sbin/haltia-dbmd8
+output_log=/var/log/haltia-dbmd8.log
+error_log=/var/log/haltia-dbmd8.log
+respawn_delay=10
+respawn_max=3
+
+depend() {
+	after localmount
+}
+
+start_pre() {
+	modprobe spidev
+}

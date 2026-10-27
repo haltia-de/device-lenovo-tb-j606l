@@ -1,0 +1,20 @@
+#!/bin/sh
+# The Haltia session on the TB-J606L. phoc renders with GLES2 on the
+# Adreno 610 (freedreno) through the MSM display driver.
+export HOME=/root XDG_RUNTIME_DIR=/run/user/0
+export WLR_NO_HARDWARE_CURSORS=1 LIBSEAT_BACKEND=seatd
+export PHOC_DEBUG=fake-builtin
+export XDG_SESSION_TYPE=wayland XDG_CURRENT_DESKTOP=Haltia:GNOME
+export XDG_SESSION_DESKTOP=haltia LANG=ru_RU.UTF-8
+mkdir -p "$XDG_RUNTIME_DIR"
+chmod 700 "$XDG_RUNTIME_DIR"
+# Linux stays the default system once the session has run for a minute.
+( sleep 60; pidof phoc >/dev/null && /usr/sbin/haltia-boot linux ) &
+( trap '' HUP
+while :; do
+	u=$(cat /etc/haltia/session-user 2>/dev/null)
+	id "$u" >/dev/null 2>&1 || u=root
+	/usr/bin/haltia-session -u "$u" dbus-run-session -- phoc -C /etc/haltia/phoc.ini -E /usr/bin/haltia-launcher >>/var/log/session.log 2>&1
+	killall pipewire pipewire-pulse wireplumber 2>/dev/null
+	sleep 2
+done ) >/dev/null 2>&1 &

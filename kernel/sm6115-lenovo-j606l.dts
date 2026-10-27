@@ -1,0 +1,911 @@
+// SPDX-License-Identifier: BSD-3-Clause
+/* Lenovo Tab P11 TB-J606L (LTE). Derived from the upstream J606F tree. */
+#include <dt-bindings/input/gpio-keys.h>
+#include <dt-bindings/sound/qcom,q6afe.h>
+#include <dt-bindings/sound/qcom,q6asm.h>
+#include <dt-bindings/usb/pd.h>
+#include "sm6115p-lenovo-j606f.dts"
+
+/ {
+	model = "Lenovo Tab P11 TB-J606L";
+	compatible = "lenovo,j606l", "qcom,sm6115p", "qcom,sm6115";
+	/* Measured on the lab unit: SoC 444, platform 0x10000; board 34/3. */
+	qcom,msm-id = <444 0x10000>;
+	qcom,board-id = <34 3>;
+
+	aliases {
+		serial1 = &uart3;
+	};
+
+	/* Four AW88258 speaker amplifiers on the LPASS primary MI2S port
+	 * (data line 1). The microphones come from the DBMD8 voice processor on
+	 * the secondary port (data line 1, the DBMD8 drives the clocks); the
+	 * WCD937x biases them while something records. */
+	sound {
+		compatible = "qcom,qrb4210-rb2-sndcard";
+		model = "Lenovo-TB-J606L";
+		pinctrl-0 = <&lpi_i2s1_active>, <&lpi_i2s2_active>;
+		pinctrl-names = "default";
+		/* The analog microphones on the DBMD8 take their bias from the
+		 * WCD937x: on while anything records from them. */
+		aux-devs = <&wcd937x>;
+		audio-routing = "MIC", "MIC BIAS1",
+				"MIC", "MIC BIAS3";
+
+		mm1-dai-link {
+			link-name = "MultiMedia1";
+
+			cpu {
+				sound-dai = <&q6asmdai MSM_FRONTEND_DAI_MULTIMEDIA1>;
+			};
+		};
+
+		mm2-dai-link {
+			link-name = "MultiMedia2";
+
+			cpu {
+				sound-dai = <&q6asmdai MSM_FRONTEND_DAI_MULTIMEDIA2>;
+			};
+		};
+
+		speaker-dai-link {
+			link-name = "Speaker Playback";
+
+			cpu {
+				sound-dai = <&q6afedai PRIMARY_MI2S_RX>;
+			};
+
+			platform {
+				sound-dai = <&q6routing>;
+			};
+
+			codec {
+				sound-dai = <&speaker0>, <&speaker1>, <&speaker2>, <&speaker3>;
+			};
+		};
+
+		mic-dai-link {
+			link-name = "Mic Capture";
+
+			cpu {
+				sound-dai = <&q6afedai SECONDARY_MI2S_TX>;
+			};
+
+			platform {
+				sound-dai = <&q6routing>;
+			};
+
+			codec {
+				sound-dai = <&microphones>;
+			};
+		};
+	};
+
+	/* Hall sensor for the folio cover, as the stock hall_switch. */
+	gpio-keys-lid {
+		compatible = "gpio-keys";
+		pinctrl-0 = <&hall_int_default>;
+		pinctrl-names = "default";
+
+		switch-lid {
+			label = "Cover";
+			gpios = <&tlmm 36 GPIO_ACTIVE_LOW>;
+			linux,input-type = <EV_SW>;
+			linux,code = <SW_LID>;
+			debounce-interval = <15>;
+			wakeup-source;
+			/* Wake when the cover opens, not on the closing edge. */
+			wakeup-event-action = <EV_ACT_DEASSERTED>;
+		};
+	};
+};
+
+/* Only the HS PHY is wired. Without UTMI as the pipe clock the core comes
+ * up only after a fastboot session left it clocked (26 October 2026). */
+&usb { qcom,select-utmi-as-pipe-clk; };
+
+/* The modem runs the WLAN firmware. haltia-firmware copies the stock split
+ * images from modem_b; rmtfs serves copies of the EFS partitions read-only. */
+&remoteproc_mpss {
+	firmware-name = "qcom/sm6115/LENOVO/J606L/modem.mdt";
+	status = "okay";
+};
+
+/* Display through MSM DRM and the upstream J606F panel driver (the J606L
+ * has the same BOE NT36523W, as its stock command line names). simplefb
+ * shows the bootloader picture until msm takes over. The GPU loads the
+ * stock zap shader that haltia-firmware copies from vendor_b. */
+&gpu_zap_shader {
+	firmware-name = "qcom/sm6115/LENOVO/J606L/a610_zap.mdt";
+};
+
+/* ADSP runs the audio services (APR: q6afe, q6asm) and the sensors; CDSP
+ * is the compute DSP. Both boot the stock split images from modem_b. */
+&remoteproc_adsp {
+	firmware-name = "qcom/sm6115/LENOVO/J606L/adsp.mdt";
+	status = "okay";
+};
+
+&remoteproc_cdsp {
+	firmware-name = "qcom/sm6115/LENOVO/J606L/cdsp.mdt";
+	status = "okay";
+};
+
+/* Touch: Novatek NT36523 (TDDI, no flash) on QUP SE2 SPI, chip select 1,
+ * as in the stock overlay. The driver loads novatek_ts_fw.bin from the
+ * stock vendor partition at every start. */
+&qupv3_id_0 { status = "okay"; };
+
+&spi2 {
+	/* GPI DMA transfers stalled the touch thread in spi_transfer_one_message;
+	 * without dmas the GENI controller uses FIFO and SE DMA. */
+	/delete-property/ dmas;
+	/delete-property/ dma-names;
+	status = "okay";
+
+	touchscreen@0 {
+		compatible = "novatek,NVT-ts-spi";
+		reg = <0>;
+		/* The NT36523W is touch and display in one: turning the panel off
+		 * resets the touch side, so the driver follows the panel and loads
+		 * the touch firmware again whenever it comes back on. */
+		panel = <&panel>;
+		spi-max-frequency = <9600000>;
+		interrupts-extended = <&tlmm 86 IRQ_TYPE_EDGE_RISING>;
+		reset-gpios = <&tlmm 54 GPIO_ACTIVE_HIGH>;
+		irq-gpios = <&tlmm 86 GPIO_ACTIVE_HIGH>;
+		firmware-name = "novatek_ts_fw.bin";
+		pinctrl-0 = <&ts_int_default>;
+		pinctrl-names = "default";
+		novatek,swrst-n8-addr = <0x3f0fe>;
+		novatek,spi-rd-fast-addr = <0x3f310>;
+		novatek,event-buf-addr = <0x2fe00>;
+		novatek,coords-12bit;
+		/* A double tap wakes the tablet from sleep (gesture mode). */
+		novatek,double-tap-wake;
+		touchscreen-size-x = <1200>;
+		touchscreen-size-y = <2000>;
+	};
+};
+
+&tlmm {
+	/* The stock "pmx_ts_int_active": the interrupt line needs a pull-up. */
+	ts_int_default: ts-int-default-state {
+		pins = "gpio86";
+		function = "gpio";
+		drive-strength = <8>;
+		bias-pull-up;
+	};
+};
+
+/* Battery gauge on QUP SE0 I2C, as in the stock overlay. GENI I2C needs
+ * its GPI DMA channels to probe. */
+&gpi_dma0 { status = "okay"; };
+
+&i2c0 {
+	clock-frequency = <400000>;
+	status = "okay";
+
+	/* The amplifiers share reset GPIO 42; awinic,channel picks each one's
+	 * section of the stock ACF profile (left/right on SD0, then SD1). */
+	speaker0: audio-codec@34 {
+		compatible = "awinic,aw88258";
+		reg = <0x34>;
+		reset-gpios = <&tlmm 42 GPIO_ACTIVE_LOW>;
+		awinic,channel = <0>;
+		sound-name-prefix = "Speaker 0";
+		#sound-dai-cells = <0>;
+	};
+
+	speaker1: audio-codec@35 {
+		compatible = "awinic,aw88258";
+		reg = <0x35>;
+		reset-gpios = <&tlmm 42 GPIO_ACTIVE_LOW>;
+		awinic,channel = <1>;
+		sound-name-prefix = "Speaker 1";
+		#sound-dai-cells = <0>;
+	};
+
+	speaker2: audio-codec@36 {
+		compatible = "awinic,aw88258";
+		reg = <0x36>;
+		reset-gpios = <&tlmm 42 GPIO_ACTIVE_LOW>;
+		awinic,channel = <2>;
+		sound-name-prefix = "Speaker 2";
+		#sound-dai-cells = <0>;
+	};
+
+	speaker3: audio-codec@37 {
+		compatible = "awinic,aw88258";
+		reg = <0x37>;
+		reset-gpios = <&tlmm 42 GPIO_ACTIVE_LOW>;
+		awinic,channel = <3>;
+		sound-name-prefix = "Speaker 3";
+		#sound-dai-cells = <0>;
+	};
+
+	/* USB-C port controller, as the stock fusb302@22. A sink only for now:
+	 * its power supply tells the shell when a charger is plugged in. */
+	typec@22 {
+		compatible = "fcs,fusb302";
+		reg = <0x22>;
+		interrupts-extended = <&tlmm 97 IRQ_TYPE_LEVEL_LOW>;
+		pinctrl-0 = <&fusb302_int_default>;
+		pinctrl-names = "default";
+
+		connector {
+			compatible = "usb-c-connector";
+			label = "USB-C";
+			power-role = "sink";
+			data-role = "device";
+			self-powered;
+			sink-pdos = <PDO_FIXED(5000, 2000, PDO_FIXED_USB_COMM)>;
+			op-sink-microwatt = <10000000>;
+		};
+	};
+
+	fuel-gauge@55 {
+		compatible = "mitsumi,mm8013";
+		reg = <0x55>;
+	};
+};
+
+/* Backlight: SGM37604A on QUP SE1 I2C; PMI632 GPIO 6 enables it (the
+ * bootloader leaves it on). */
+&i2c1 {
+	clock-frequency = <400000>;
+	status = "okay";
+
+	/* An ADC on the secondary MI2S data line 0 (Lenovo's AEC reference path,
+	 * not the microphones); vcc is L24, shared with the UFS. */
+	microphones: audio-codec@40 {
+		compatible = "everest,es7210";
+		reg = <0x40>;
+		vcc-supply = <&pm6125_l24>;
+		#sound-dai-cells = <0>;
+	};
+
+	backlight@36 {
+		compatible = "sgmicro,sgm37604a";
+		reg = <0x36>;
+	};
+};
+
+/* Bluetooth: the WCN3990 on QUP SE3 high-speed UART, supplies as in the
+ * stock bt_wcn3990 node. Firmware comes from linux-firmware-qca. */
+&uart3 {
+	interrupts-extended = <&intc GIC_SPI 330 IRQ_TYPE_LEVEL_HIGH>,
+			      <&tlmm 11 IRQ_TYPE_EDGE_FALLING>;
+	pinctrl-0 = <&uart3_default>;
+	pinctrl-1 = <&uart3_sleep>;
+	pinctrl-names = "default", "sleep";
+	status = "okay";
+
+	bluetooth {
+		compatible = "qcom,wcn3990-bt";
+		vddio-supply = <&pm6125_l9>;
+		vddxo-supply = <&pm6125_l16>;
+		vddrf-supply = <&pm6125_l17>;
+		vddch0-supply = <&pm6125_l23>;
+		max-speed = <3200000>;
+	};
+};
+
+&tlmm {
+	fusb302_int_default: fusb302-int-default-state {
+		pins = "gpio97";
+		function = "gpio";
+		drive-strength = <2>;
+		bias-pull-up;
+	};
+
+	hall_int_default: hall-int-default-state {
+		pins = "gpio36";
+		function = "gpio";
+		drive-strength = <6>;
+		bias-pull-up;
+	};
+
+	uart3_default: uart3-default-state {
+		cts-pins {
+			pins = "gpio8";
+			function = "qup3";
+			drive-strength = <2>;
+			bias-bus-hold;
+		};
+
+		rts-pins {
+			pins = "gpio9";
+			function = "qup3";
+			drive-strength = <2>;
+			bias-disable;
+		};
+
+		tx-pins {
+			pins = "gpio10";
+			function = "qup3";
+			drive-strength = <2>;
+			bias-disable;
+		};
+
+		rx-pins {
+			pins = "gpio11";
+			function = "qup3";
+			drive-strength = <2>;
+			bias-pull-up;
+		};
+	};
+
+	uart3_sleep: uart3-sleep-state {
+		cts-pins {
+			pins = "gpio8";
+			function = "gpio";
+			drive-strength = <2>;
+			bias-bus-hold;
+		};
+
+		rts-pins {
+			pins = "gpio9";
+			function = "gpio";
+			drive-strength = <2>;
+			bias-pull-down;
+		};
+
+		tx-pins {
+			pins = "gpio10";
+			function = "gpio";
+			drive-strength = <2>;
+			bias-pull-up;
+		};
+
+		rx-pins {
+			pins = "gpio11";
+			function = "gpio";
+			drive-strength = <2>;
+			bias-pull-up;
+		};
+	};
+};
+
+&q6afedai {
+	dai@16 {
+		reg = <PRIMARY_MI2S_RX>;
+		qcom,sd-lines = <1>;
+	};
+
+	dai@19 {
+		reg = <SECONDARY_MI2S_TX>;
+		qcom,sd-lines = <1>;
+	};
+};
+
+&lpass_tlmm {
+	lpi_i2s2_active: lpi-i2s2-active-state {
+		sck-pins {
+			pins = "gpio10";
+			function = "i2s2_clk";
+			drive-strength = <8>;
+			bias-disable;
+		};
+
+		ws-pins {
+			pins = "gpio11";
+			function = "i2s2_ws";
+			drive-strength = <8>;
+			bias-disable;
+		};
+
+		data-pins {
+			pins = "gpio12", "gpio13";
+			function = "i2s2_data";
+			drive-strength = <8>;
+			bias-disable;
+		};
+	};
+
+	lpi_i2s1_active: lpi-i2s1-active-state {
+		sck-pins {
+			pins = "gpio6";
+			function = "i2s1_clk";
+			drive-strength = <8>;
+			bias-disable;
+			output-high;
+		};
+
+		ws-pins {
+			pins = "gpio7";
+			function = "i2s1_ws";
+			drive-strength = <8>;
+			bias-disable;
+			output-high;
+		};
+
+		data-pins {
+			pins = "gpio8", "gpio9";
+			function = "i2s1_data";
+			drive-strength = <8>;
+			bias-disable;
+			output-high;
+		};
+	};
+};
+
+/* The touch half of the TDDI chip needs it powered and out of reset while
+ * the display sleeps, to see the double tap that wakes the tablet. */
+&panel {
+	novatek,tddi-touch-wake;
+};
+
+/* The DSP Group DBMD8 voice processor in front of the microphones. There is
+ * no kernel driver yet: haltia-dbmd8 drives it through spidev. */
+&spi5 {
+	status = "okay";
+
+	dbmd8@0 {
+		compatible = "rohm,dh2228fv";
+		reg = <0>;
+		spi-max-frequency = <5000000>;
+	};
+};
+
+/* J606F reserves gpio14-17; on the J606L they are SPI5 to the DBMD8 voice
+ * processor, as the stock kernel uses them. */
+&tlmm {
+	/delete-property/ gpio-reserved-ranges;
+};
+
+/* LPASS codec macros and SoundWire, as for the QRB4210 RB2 (Alexey Klimov's
+ * sm6115 LPASS series), for the WCD937x. */
+&soc {
+	rxmacro: codec@a600000 {
+		compatible = "qcom,sm6115-lpass-rx-macro";
+		reg = <0x0 0xa600000 0x0 0x1000>;
+		clocks = <&q6afecc LPASS_CLK_ID_RX_CORE_MCLK LPASS_CLK_ATTRIBUTE_COUPLE_NO>,
+			 <&q6afecc LPASS_CLK_ID_RX_CORE_NPL_MCLK LPASS_CLK_ATTRIBUTE_COUPLE_NO>,
+			 <&q6afecc LPASS_HW_DCODEC_VOTE LPASS_CLK_ATTRIBUTE_COUPLE_NO>,
+			 <&vamacro>;
+		clock-names = "mclk", "npl", "dcodec", "fsgen";
+		assigned-clocks = <&q6afecc LPASS_CLK_ID_RX_CORE_MCLK LPASS_CLK_ATTRIBUTE_COUPLE_NO>,
+				  <&q6afecc LPASS_CLK_ID_RX_CORE_NPL_MCLK LPASS_CLK_ATTRIBUTE_COUPLE_NO>;
+		assigned-clock-rates = <22579200>, <22579200>;
+		#clock-cells = <0>;
+		clock-output-names = "mclk";
+		#sound-dai-cells = <1>;
+	};
+
+	swr1: soundwire@a610000 {
+		compatible = "qcom,soundwire-v1.6.0";
+		reg = <0x0 0x0a610000 0x0 0x2000>;
+		interrupts = <GIC_SPI 297 IRQ_TYPE_LEVEL_HIGH>;
+		clocks = <&rxmacro>;
+		clock-names = "iface";
+		resets = <&lpass_audiocc 0>;
+		reset-names = "swr_audio_cgcr";
+		pinctrl-0 = <&lpass_rx_swr_active>;
+		pinctrl-names = "default";
+		label = "RX";
+		qcom,din-ports = <0>;
+		qcom,dout-ports = <5>;
+		qcom,ports-sinterval-low =	/bits/ 8 <0x03 0x1f 0x1f 0x07 0x00>;
+		qcom,ports-offset1 =		/bits/ 8 <0x00 0x00 0x0b 0x01 0x00>;
+		qcom,ports-offset2 =		/bits/ 8 <0x00 0x00 0x0b 0x00 0x00>;
+		qcom,ports-hstart =		/bits/ 8 <0xff 0x03 0xff 0xff 0xff>;
+		qcom,ports-hstop =		/bits/ 8 <0xff 0x06 0xff 0xff 0xff>;
+		qcom,ports-word-length =	/bits/ 8 <0x01 0x07 0x04 0xff 0xff>;
+		qcom,ports-block-pack-mode =	/bits/ 8 <0xff 0x00 0x01 0xff 0xff>;
+		qcom,ports-block-group-count =	/bits/ 8 <0xff 0xff 0xff 0xff 0x00>;
+		qcom,ports-lane-control =	/bits/ 8 <0x01 0x00 0x00 0x00 0x00>;
+		#sound-dai-cells = <1>;
+		#address-cells = <2>;
+		#size-cells = <0>;
+
+		wcd937x_rx: codec@0,4 {
+			compatible = "sdw20217010a00";
+			reg = <0 4>;
+			qcom,rx-port-mapping = <1 2 3 4 5>;
+		};
+	};
+
+	txmacro: codec@a620000 {
+		compatible = "qcom,sm6115-lpass-tx-macro";
+		reg = <0x0 0x0a620000 0x0 0x1000>;
+		clocks = <&q6afecc LPASS_CLK_ID_TX_CORE_MCLK LPASS_CLK_ATTRIBUTE_COUPLE_NO>,
+			 <&q6afecc LPASS_CLK_ID_TX_CORE_NPL_MCLK LPASS_CLK_ATTRIBUTE_COUPLE_NO>,
+			 <&q6afecc LPASS_HW_DCODEC_VOTE LPASS_CLK_ATTRIBUTE_COUPLE_NO>,
+			 <&vamacro>;
+		clock-names = "mclk", "npl", "dcodec", "fsgen";
+		assigned-clocks = <&q6afecc LPASS_CLK_ID_TX_CORE_MCLK LPASS_CLK_ATTRIBUTE_COUPLE_NO>,
+				  <&q6afecc LPASS_CLK_ID_TX_CORE_NPL_MCLK LPASS_CLK_ATTRIBUTE_COUPLE_NO>;
+		assigned-clock-rates = <19200000>, <19200000>;
+		#clock-cells = <0>;
+		clock-output-names = "mclk";
+		#sound-dai-cells = <1>;
+	};
+
+	lpass_audiocc: clock-controller@a6a9000 {
+		compatible = "qcom,sm6115-lpassaudiocc";
+		reg = <0x0 0x0a6a9000 0x0 0x1000>;
+		#reset-cells = <1>;
+	};
+
+	vamacro: codec@a730000 {
+		compatible = "qcom,sm6115-lpass-va-macro";
+		reg = <0x0 0x0a730000 0x0 0x1000>;
+		clocks = <&q6afecc LPASS_CLK_ID_TX_CORE_MCLK LPASS_CLK_ATTRIBUTE_COUPLE_NO>,
+			 <&q6afecc LPASS_HW_DCODEC_VOTE LPASS_CLK_ATTRIBUTE_COUPLE_NO>,
+			 <&q6afecc LPASS_CLK_ID_TX_CORE_NPL_MCLK LPASS_CLK_ATTRIBUTE_COUPLE_NO>;
+		clock-names = "mclk", "dcodec", "npl";
+		assigned-clocks = <&q6afecc LPASS_CLK_ID_TX_CORE_MCLK LPASS_CLK_ATTRIBUTE_COUPLE_NO>,
+				  <&q6afecc LPASS_CLK_ID_TX_CORE_NPL_MCLK LPASS_CLK_ATTRIBUTE_COUPLE_NO>;
+		assigned-clock-rates = <19200000>, <19200000>;
+		#clock-cells = <0>;
+		clock-output-names = "fsgen";
+		#sound-dai-cells = <1>;
+	};
+
+	swr0: soundwire@a740000 {
+		compatible = "qcom,soundwire-v1.6.0";
+		reg = <0x0 0x0a740000 0x0 0x2000>;
+		interrupts = <GIC_SPI 296 IRQ_TYPE_LEVEL_HIGH>,
+			     <GIC_SPI 79 IRQ_TYPE_LEVEL_HIGH>;
+		clocks = <&txmacro>;
+		clock-names = "iface";
+		resets = <&lpasscc 0>;
+		reset-names = "swr_audio_cgcr";
+		pinctrl-0 = <&lpass_tx_swr_active>;
+		pinctrl-names = "default";
+		label = "VA_TX";
+		qcom,din-ports = <3>;
+		qcom,dout-ports = <0>;
+		qcom,ports-sinterval-low =	/bits/ 8 <0x03 0x03 0x03>;
+		qcom,ports-offset1 =		/bits/ 8 <0x01 0x02 0x01>;
+		qcom,ports-offset2 =		/bits/ 8 <0x00 0x00 0x00>;
+		qcom,ports-hstart =		/bits/ 8 <0xff 0xff 0xff>;
+		qcom,ports-hstop =		/bits/ 8 <0xff 0xff 0xff>;
+		qcom,ports-word-length =	/bits/ 8 <0xff 0xff 0xff>;
+		qcom,ports-block-pack-mode =	/bits/ 8 <0xff 0xff 0xff>;
+		qcom,ports-block-group-count =	/bits/ 8 <0xff 0xff 0xff>;
+		qcom,ports-lane-control =	/bits/ 8 <0x00 0x00 0x00>;
+		#sound-dai-cells = <1>;
+		#address-cells = <2>;
+		#size-cells = <0>;
+
+		wcd937x_tx: codec@0,3 {
+			compatible = "sdw20217010a00";
+			reg = <0 3>;
+			qcom,tx-port-mapping = <1 1 2 3>;
+		};
+	};
+
+	lpasscc: clock-controller@a7ec000 {
+		compatible = "qcom,sm6115-lpasscc";
+		reg = <0x0 0x0a7ec000 0x0 0x1000>;
+		#reset-cells = <1>;
+	};
+};
+
+/ {
+	/* The battery rail; the WCD937x makes the mic bias from it. */
+	vph_pwr: regulator-vph-pwr {
+		compatible = "regulator-fixed";
+		regulator-name = "vph_pwr";
+		regulator-min-microvolt = <3700000>;
+		regulator-max-microvolt = <3700000>;
+		regulator-always-on;
+		regulator-boot-on;
+	};
+
+	wcd937x: codec {
+		compatible = "qcom,wcd9370-codec";
+		pinctrl-0 = <&wcd_reset_n>;
+		pinctrl-names = "default";
+		reset-gpios = <&tlmm 92 GPIO_ACTIVE_LOW>;
+		vdd-buck-supply = <&pm6125_l14>;
+		vdd-rxtx-supply = <&pm6125_l9>;
+		vdd-px-supply = <&pm6125_l9>;
+		vdd-mic-bias-supply = <&vph_pwr>;
+		qcom,micbias1-microvolt = <1800000>;
+		qcom,micbias2-microvolt = <1800000>;
+		qcom,micbias3-microvolt = <1800000>;
+		qcom,micbias4-microvolt = <1800000>;
+		qcom,mbhc-buttons-vthreshold-microvolt = <75000 150000 237000 500000 500000 500000 500000 500000>;
+		qcom,rx-device = <&wcd937x_rx>;
+		qcom,tx-device = <&wcd937x_tx>;
+		#sound-dai-cells = <1>;
+	};
+};
+
+&tlmm {
+	wcd_reset_n: wcd-reset-n-state {
+		pins = "gpio92";
+		function = "gpio";
+		drive-strength = <16>;
+		output-high;
+	};
+};
+
+&lpass_tlmm {
+	lpass_tx_swr_active: lpass-tx-swr-active-state {
+		clk-pins {
+			pins = "gpio0";
+			function = "swr_tx_clk";
+			drive-strength = <10>;
+			slew-rate = <3>;
+			bias-disable;
+		};
+
+		data-pins {
+			pins = "gpio1", "gpio2";
+			function = "swr_tx_data";
+			drive-strength = <10>;
+			slew-rate = <3>;
+			bias-bus-hold;
+		};
+	};
+
+	lpass_rx_swr_active: lpass-rx-swr-active-state {
+		clk-pins {
+			pins = "gpio3";
+			function = "swr_rx_clk";
+			drive-strength = <10>;
+			slew-rate = <3>;
+			bias-disable;
+		};
+
+		data-pins {
+			pins = "gpio4", "gpio5";
+			function = "swr_rx_data";
+			drive-strength = <10>;
+			slew-rate = <3>;
+			bias-bus-hold;
+		};
+	};
+};
+
+/* Cameras: the front OV8856 on CCI master 1 and CSIPHY2. GPIOs 112 and
+ * 108 power both sensors (patch 0009 lets the TLMM drive them). */
+/ {
+	cam_avdd: regulator-cam-avdd {
+		compatible = "regulator-fixed";
+		regulator-name = "cam_avdd";
+		gpio = <&tlmm 112 GPIO_ACTIVE_HIGH>;
+		enable-active-high;
+		startup-delay-us = <1000>;
+	};
+
+	cam_dvdd: regulator-cam-dvdd {
+		compatible = "regulator-fixed";
+		regulator-name = "cam_dvdd";
+		gpio = <&tlmm 108 GPIO_ACTIVE_HIGH>;
+		enable-active-high;
+		startup-delay-us = <1000>;
+	};
+};
+
+&soc {
+	cci: cci@5c1b000 {
+		compatible = "qcom,qcm2290-cci", "qcom,msm8996-cci";
+		reg = <0x0 0x5c1b000 0x0 0x1000>;
+		interrupts = <GIC_SPI 206 IRQ_TYPE_EDGE_RISING>;
+		clocks = <&gcc GCC_CAMSS_TOP_AHB_CLK>, <&gcc GCC_CAMSS_CCI_0_CLK>;
+		clock-names = "ahb", "cci";
+		assigned-clocks = <&gcc GCC_CAMSS_CCI_0_CLK>;
+		assigned-clock-rates = <37500000>;
+		power-domains = <&gcc GCC_CAMSS_TOP_GDSC>;
+		pinctrl-0 = <&cci0_default &cci1_default>;
+		pinctrl-names = "default";
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		cci_i2c0: i2c-bus@0 {
+			reg = <0>;
+			clock-frequency = <400000>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+		};
+
+		cci_i2c1: i2c-bus@1 {
+			reg = <1>;
+			clock-frequency = <400000>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			front_cam: camera@36 {
+				compatible = "ovti,ov8856";
+				reg = <0x36>;
+				clocks = <&gcc GCC_CAMSS_MCLK2_CLK>;
+				clock-names = "xvclk";
+				assigned-clocks = <&gcc GCC_CAMSS_MCLK2_CLK>;
+				assigned-clock-rates = <19200000>;
+				pinctrl-0 = <&mclk2_default>;
+				pinctrl-names = "default";
+				reset-gpios = <&tlmm 19 GPIO_ACTIVE_LOW>;
+				orientation = <0>;
+				/* haltia_kit turns the picture by this and by the screen's
+				 * rotation, then mirrors it. Checked on the tablet: 0 left the
+				 * picture's top to the right in landscape, 270 upside down. */
+				rotation = <90>;
+				avdd-supply = <&cam_avdd>;
+				dvdd-supply = <&cam_dvdd>;
+
+				port {
+					front_cam_ep: endpoint {
+						data-lanes = <1 2 3 4>;
+						link-frequencies = /bits/ 64 <360000000 180000000>;
+						remote-endpoint = <&camss_csiphy2_ep>;
+					};
+				};
+			};
+		};
+	};
+
+	camss: camss@5c11000 {
+		compatible = "qcom,sm6115-camss";
+		reg = <0x0 0x5c11000 0x0 0x1000>,
+		      <0x0 0x5c6e000 0x0 0x1000>,
+		      <0x0 0x5c75000 0x0 0x1000>,
+		      <0x0 0x5c52000 0x0 0x1000>,
+		      <0x0 0x5c53000 0x0 0x1000>,
+		      <0x0 0x5c54000 0x0 0x1000>,
+		      <0x0 0x5c66000 0x0 0x400>,
+		      <0x0 0x5c68000 0x0 0x400>,
+		      <0x0 0x5c6f000 0x0 0x4000>,
+		      <0x0 0x5c76000 0x0 0x4000>;
+		reg-names = "top", "csid0", "csid1", "csiphy0", "csiphy1", "csiphy2",
+			    "csitpg0", "csitpg1", "vfe0", "vfe1";
+		clocks = <&gcc GCC_CAMERA_AHB_CLK>,
+			 <&gcc GCC_CAMSS_AXI_CLK>,
+			 <&gcc GCC_CAMSS_NRT_AXI_CLK>,
+			 <&gcc GCC_CAMSS_RT_AXI_CLK>,
+			 <&gcc GCC_CAMSS_TFE_0_CSID_CLK>,
+			 <&gcc GCC_CAMSS_TFE_1_CSID_CLK>,
+			 <&gcc GCC_CAMSS_CPHY_0_CLK>,
+			 <&gcc GCC_CAMSS_CSI0PHYTIMER_CLK>,
+			 <&gcc GCC_CAMSS_CPHY_1_CLK>,
+			 <&gcc GCC_CAMSS_CSI1PHYTIMER_CLK>,
+			 <&gcc GCC_CAMSS_CPHY_2_CLK>,
+			 <&gcc GCC_CAMSS_CSI2PHYTIMER_CLK>,
+			 <&gcc GCC_CAMSS_TOP_AHB_CLK>,
+			 <&gcc GCC_CAMSS_TFE_0_CLK>,
+			 <&gcc GCC_CAMSS_TFE_0_CPHY_RX_CLK>,
+			 <&gcc GCC_CAMSS_TFE_1_CLK>,
+			 <&gcc GCC_CAMSS_TFE_1_CPHY_RX_CLK>;
+		clock-names = "ahb", "axi", "camnoc_nrt_axi", "camnoc_rt_axi",
+			      "csi0", "csi1", "csiphy0", "csiphy0_timer",
+			      "csiphy1", "csiphy1_timer", "csiphy2", "csiphy2_timer",
+			      "top_ahb", "vfe0", "vfe0_cphy_rx", "vfe1", "vfe1_cphy_rx";
+		interrupts = <GIC_SPI 210 IRQ_TYPE_EDGE_RISING>,
+			     <GIC_SPI 212 IRQ_TYPE_EDGE_RISING>,
+			     <GIC_SPI 72 IRQ_TYPE_EDGE_RISING>,
+			     <GIC_SPI 73 IRQ_TYPE_EDGE_RISING>,
+			     <GIC_SPI 74 IRQ_TYPE_EDGE_RISING>,
+			     <GIC_SPI 309 IRQ_TYPE_EDGE_RISING>,
+			     <GIC_SPI 310 IRQ_TYPE_EDGE_RISING>,
+			     <GIC_SPI 211 IRQ_TYPE_EDGE_RISING>,
+			     <GIC_SPI 213 IRQ_TYPE_EDGE_RISING>;
+		interrupt-names = "csid0", "csid1", "csiphy0", "csiphy1", "csiphy2",
+				  "csitpg0", "csitpg1", "vfe0", "vfe1";
+		interconnects = <&bimc MASTER_AMPSS_M0 RPM_ACTIVE_TAG
+				 &config_noc SLAVE_CAMERA_CFG RPM_ACTIVE_TAG>,
+				<&mmrt_virt MASTER_CAMNOC_HF RPM_ALWAYS_TAG
+				 &bimc SLAVE_EBI_CH0 RPM_ALWAYS_TAG>,
+				<&mmnrt_virt MASTER_CAMNOC_SF RPM_ALWAYS_TAG
+				 &bimc SLAVE_EBI_CH0 RPM_ALWAYS_TAG>;
+		interconnect-names = "ahb", "hf_mnoc", "sf_mnoc";
+		iommus = <&apps_smmu 0x400 0x0>,
+			 <&apps_smmu 0x800 0x0>,
+			 <&apps_smmu 0x820 0x0>,
+			 <&apps_smmu 0x840 0x0>;
+		power-domains = <&gcc GCC_CAMSS_TOP_GDSC>;
+
+		ports {
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			port@2 {
+				reg = <2>;
+
+				camss_csiphy2_ep: endpoint {
+					data-lanes = <0 1 2 3>;
+					remote-endpoint = <&front_cam_ep>;
+				};
+			};
+		};
+	};
+};
+
+&tlmm {
+	cci0_default: cci0-default-state {
+		pins = "gpio22", "gpio23";
+		function = "cci_i2c";
+		drive-strength = <2>;
+		bias-pull-up;
+	};
+
+	cci1_default: cci1-default-state {
+		pins = "gpio29", "gpio30";
+		function = "cci_i2c";
+		drive-strength = <2>;
+		bias-pull-up;
+	};
+
+	mclk2_default: mclk2-default-state {
+		pins = "gpio27";
+		function = "cam_mclk";
+		drive-strength = <6>;
+		bias-disable;
+	};
+};
+
+/* The ADSP sensor framework learns from the "sleepstate" entry whether
+ * the system is awake, and wakes it through "sleepstate_see", as in the
+ * stock tree (qcom,smp2p_sleepstate; driver in patch 0013). */
+&{/smp2p-adsp} {
+	adsp_sleepstate_out: sleepstate-out {
+		qcom,entry-name = "sleepstate";
+		#qcom,smem-state-cells = <1>;
+	};
+
+	adsp_sleepstate_in: sleepstate-in {
+		qcom,entry-name = "sleepstate_see";
+		interrupt-controller;
+		#interrupt-cells = <2>;
+	};
+};
+
+/ {
+	smp2p-sleepstate {
+		compatible = "qcom,smp2p-sleepstate";
+		qcom,smem-states = <&adsp_sleepstate_out 0>;
+		interrupts-extended = <&adsp_sleepstate_in 0 IRQ_TYPE_EDGE_RISING>;
+	};
+};
+
+/* MPM, as on QCM2290 (agatti.dtsi). It watches the wake-up interrupts while
+ * the GIC is off, and as the parent of both CPU clusters it tells the RPM
+ * that the whole application processor sleeps: without it the SoC never
+ * reached the RPM's vlow/vmin. The pin map is the downstream bengal one
+ * (qcom-mpm-bengal.c), less 32 for the SPI numbers. */
+&rpm_msg_ram {
+	compatible = "qcom,rpm-msg-ram", "mmio-sram";
+	#address-cells = <1>;
+	#size-cells = <1>;
+	ranges = <0 0x0 0x045f0000 0x7000>;
+
+	apss_mpm: sram@1b8 {
+		reg = <0x1b8 0x48>;
+	};
+};
+
+&rpm {
+	mpm: interrupt-controller {
+		compatible = "qcom,mpm";
+		qcom,rpm-msg-ram = <&apss_mpm>;
+		interrupts = <GIC_SPI 197 IRQ_TYPE_EDGE_RISING>;
+		mboxes = <&apcs_glb 1>;
+		interrupt-controller;
+		#interrupt-cells = <2>;
+		#power-domain-cells = <0>;
+		interrupt-parent = <&intc>;
+		qcom,mpm-pin-count = <96>;
+		qcom,mpm-pin-map = <2 190>,  /* TSENS */
+				   <5 296>,  /* LPASS SoundWire */
+				   <12 422>, /* DWC3 ss_phy_irq */
+				   <24 79>,  /* LPASS LPI */
+				   <86 183>, /* MPM wake, SPMI */
+				   <90 260>; /* QUSB2 PHY DP+DM (downstream maps pin 91
+					      * there too; one pin per GIC line here) */
+	};
+};
+
+&cluster_0_pd {
+	power-domains = <&mpm>;
+};
+
+&cluster_1_pd {
+	power-domains = <&mpm>;
+};
+
+&tlmm {
+	wakeup-parent = <&mpm>;
+};
