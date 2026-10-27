@@ -1,15 +1,15 @@
 From: Mikhail Nevskiy <rensomail@gmail.com>
-Subject: [PATCH] ASoC: add the ES7210 microphone ADC and secondary MI2S capture
+Subject: [PATCH] ASoC: add the ES7210 ADC and secondary MI2S capture for the J606L
 
-The TB-J606L's microphones sit behind an Everest ES7210 ADC on I2C and
-reach LPASS on the secondary MI2S port. Add a small ES7210 codec driver
-with Everest's Tab P11 register sequences, and let the sm8250 machine
-driver clock SECONDARY_MI2S_TX at 64 bit clocks per frame with 24-bit
-samples.
+The TB-J606L's microphones reach LPASS on the secondary MI2S port, data
+line 1, from a DSP Group DBMD8 voice processor that drives the bit and
+frame clocks itself: 2 channels, 16 kHz, 32-bit slots. The sm8250
+machine driver now makes SECONDARY_MI2S_TX a clock consumer on the
+external bit clock at that rate.
 
-On this tablet the ES7210 output passes through a DSP Group DBMD8 voice
-processor before it reaches the SoC, so capture only carries the
-microphones once the DBMD8 runs.
+An Everest ES7210 ADC also sits on the port's data line 0. A small codec
+driver with Everest's Tab P11 register sequences gives the capture link
+its codec and the microphone widget the WCD937x bias hangs on.
 
 ---
 diff -Naur a/sound/soc/codecs/es7210.c b/sound/soc/codecs/es7210.c
@@ -311,13 +311,14 @@ diff -Naur a/sound/soc/codecs/Makefile b/sound/soc/codecs/Makefile
 diff -Naur a/sound/soc/qcom/sm8250.c b/sound/soc/qcom/sm8250.c
 --- a/sound/soc/qcom/sm8250.c
 +++ b/sound/soc/qcom/sm8250.c
-@@ -66,7 +66,13 @@
+@@ -66,7 +66,14 @@
  
  	rate->min = rate->max = 48000;
  	channels->min = channels->max = 2;
 -	snd_mask_set_format(fmt, SNDRV_PCM_FORMAT_S16_LE);
-+	/* Microphone capture: 24-bit samples in 32-bit slots, 64 bit clocks. */
++	/* Microphone capture from the DBMD8: 16 kHz, 32-bit slots. */
 +	if (snd_soc_rtd_to_cpu(rtd, 0)->id == SECONDARY_MI2S_TX) {
++		rate->min = rate->max = 16000;
 +		snd_mask_none(fmt);
 +		snd_mask_set_format(fmt, SNDRV_PCM_FORMAT_S24_LE);
 +	} else {
@@ -326,15 +327,18 @@ diff -Naur a/sound/soc/qcom/sm8250.c b/sound/soc/qcom/sm8250.c
  
  	return 0;
  }
-@@ -89,9 +95,11 @@
- 		snd_soc_dai_set_fmt(codec_dai, codec_dai_fmt);
- 		break;
- 	case SECONDARY_MI2S_RX:
-+	case SECONDARY_MI2S_TX:
- 		codec_dai_fmt |= SND_SOC_DAIFMT_NB_NF | SND_SOC_DAIFMT_I2S;
- 		snd_soc_dai_set_sysclk(cpu_dai,
- 			Q6AFE_LPASS_CLK_ID_SEC_MI2S_IBIT,
-+			cpu_dai->id == SECONDARY_MI2S_TX ? 2 * MI2S_BCLK_RATE :
- 			MI2S_BCLK_RATE, SNDRV_PCM_STREAM_PLAYBACK);
+@@ -88,6 +95,14 @@
  		snd_soc_dai_set_fmt(cpu_dai, fmt);
  		snd_soc_dai_set_fmt(codec_dai, codec_dai_fmt);
+ 		break;
++	case SECONDARY_MI2S_TX:
++		/* The DBMD8 voice processor drives the bit and frame clocks. */
++		snd_soc_dai_set_sysclk(cpu_dai,
++			Q6AFE_LPASS_CLK_ID_SEC_MI2S_EBIT,
++			16000 * 32 * 2, SNDRV_PCM_STREAM_CAPTURE);
++		snd_soc_dai_set_fmt(cpu_dai, SND_SOC_DAIFMT_BC_FC |
++				    SND_SOC_DAIFMT_NB_NF | SND_SOC_DAIFMT_I2S);
++		break;
+ 	case SECONDARY_MI2S_RX:
+ 		codec_dai_fmt |= SND_SOC_DAIFMT_NB_NF | SND_SOC_DAIFMT_I2S;
+ 		snd_soc_dai_set_sysclk(cpu_dai,

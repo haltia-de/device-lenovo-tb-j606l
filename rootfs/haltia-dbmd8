@@ -1,0 +1,257 @@
+#!/usr/bin/python3
+"""Start the DSP Group DBMD8 voice processor of the TB-J606L and keep it up.
+
+The two analog microphones sit on the DBMD8's ADCs. It runs Lenovo's
+usecase "melon GA 2-mic AEC 16 kHz": noise and echo reduction (ASRP), two
+channels out over I2S as clock master, 16 kHz, 32-bit slots, to the SoC's
+secondary MI2S port, data line 1 (MultiMedia2 capture). The WCD937x gives
+the microphones their bias while something records.
+
+There is no kernel driver yet: this talks to it through spidev (SPI5) and
+holds its GPIOs (tlmm 52 LDO, 31 wakeup, 60 reset) for as long as it runs.
+The protocol and the register sequences follow DSP Group's GPL dbmdx driver
+in Lenovo's sources; the firmware files come from the stock vendor_b
+(haltia-firmware copies them to /lib/firmware/dspg).
+
+    haltia-dbmd8 [--raw]     boot it, start the usecase, hold (OpenRC runs it)
+"""
+import ctypes
+import fcntl
+import os
+import signal
+import struct
+import sys
+import time
+
+import gpiod
+from gpiod.line import Direction, Value
+
+SPI = "/dev/spidev1.0"
+FIRMWARE = "/lib/firmware/dspg/dbmd8_va_fw.bin"
+ASRP = "/lib/firmware/dspg/asrp_params_melon_aecnr_dual_mic_ga.bin"
+LDO, WAKE, RESET = 52, 31, 60
+
+SPI_IOC_WR_MODE = 0x40016b01
+SPI_IOC_WR_BITS_PER_WORD = 0x40016b03
+SPI_IOC_WR_MAX_SPEED_HZ = 0x40046b04
+SPI_IOC_MESSAGE_1 = 0x40206b00
+
+
+def log(msg):
+    print("haltia-dbmd8: " + msg, flush=True)
+
+
+class Dbmd8:
+    def __init__(self):
+        self.fd = os.open(SPI, os.O_RDWR)
+        fcntl.ioctl(self.fd, SPI_IOC_WR_MODE, struct.pack("B", 0))
+        fcntl.ioctl(self.fd, SPI_IOC_WR_BITS_PER_WORD, struct.pack("B", 8))
+        self.hz = 0
+        self.gpio = gpiod.request_lines("/dev/gpiochip0", consumer="dbmd8", config={
+            (LDO, WAKE, RESET): gpiod.LineSettings(direction=Direction.OUTPUT,
+                                                   output_value=Value.INACTIVE)})
+
+    def speed(self, hz):
+        self.hz = hz
+        fcntl.ioctl(self.fd, SPI_IOC_WR_MAX_SPEED_HZ, struct.pack("I", hz))
+
+    def xfer(self, tx):
+        """One full-duplex transfer: what came back while tx went out."""
+        n = len(tx)
+        txb = ctypes.create_string_buffer(bytes(tx), n)
+        rxb = ctypes.create_string_buffer(n)
+        msg = struct.pack("QQIIHBBBBBB", ctypes.addressof(txb), ctypes.addressof(rxb),
+                          n, self.hz, 0, 8, 0, 0, 0, 0, 0)
+        fcntl.ioctl(self.fd, SPI_IOC_MESSAGE_1, msg)
+        return rxb.raw
+
+    def write(self, data):
+        for i in range(0, len(data), 4096):
+            self.xfer(data[i:i + 4096])
+
+    def read(self, n):
+        return self.xfer(bytes(n))
+
+    def reg(self, reg):
+        """A 16-bit register read, "RRRr": four hex digits after one byte."""
+        self.write(b"%03xr" % reg)
+        time.sleep(0.0005)
+        return self.read(5)[1:].decode(errors="replace").lower()
+
+    def w(self, *cmds):
+        """16-bit writes, "RRRwVVVV"."""
+        for cmd in cmds:
+            self.write(cmd.encode())
+            time.sleep(0.0005)
+
+    def ioport(self, addr, val):
+        """A 32-bit I/O port write through registers 0x005 and 0x007."""
+        for reg, v in ((0x005, addr), (0x007, val)):
+            self.write(b"%03xW%08x" % (reg, v))
+            time.sleep(0.0005)
+
+    def alive(self):
+        for _ in range(20):
+            if self.reg(0x19) == "dbd8":
+                return True
+            time.sleep(0.005)
+        return False
+
+    def power_on(self):
+        self.gpio.set_value(RESET, Value.INACTIVE)
+        self.gpio.set_value(LDO, Value.ACTIVE)
+        time.sleep(0.05)
+        self.gpio.set_value(WAKE, Value.INACTIVE)  # wakeup is active low: held
+        self.gpio.set_value(RESET, Value.ACTIVE)
+        time.sleep(0.085)
+
+    def power_off(self):
+        self.gpio.set_value(RESET, Value.INACTIVE)
+        self.gpio.set_value(LDO, Value.INACTIVE)
+
+    def boot(self):
+        """Chip id, the firmware (all but its last four bytes, which are its
+        checksum), the checksum check and the boot command."""
+        fw = open(FIRMWARE, "rb").read()
+        for attempt in range(5):
+            self.power_on()
+            self.speed(5000000)
+            self.write(bytes([0x5A, 0x07, 0x74, 0x00, 0x00, 0x03]))
+            time.sleep(0.001)
+            r = self.read(7)
+            if not (r[1] == 0x5A and r[2] == 0x07 and r[3] == 0x80 and r[4] == 0xDB):
+                log("no chip id (%s), power cycling" % r.hex())
+                self.power_off()
+                time.sleep(0.3)
+                continue
+            self.write(bytes([0x5A, 0x0F]))
+            time.sleep(0.001)
+            self.write(fw[:-4])
+            self.write(bytes([0x00, 0x00, 0x5A, 0x0E]))
+            time.sleep(0.001)
+            r = self.read(7)
+            if r[3:7] != fw[-4:]:
+                log("firmware checksum %s, want %s" % (r[3:7].hex(), fw[-4:].hex()))
+                self.power_off()
+                time.sleep(0.3)
+                continue
+            self.write(bytes([0x00, 0x00, 0x5A, 0x0B]))
+            time.sleep(0.001)
+            self.speed(1000000)
+            time.sleep(0.01)
+            if self.alive():
+                log("booted, firmware %s" % self.reg(0x00))
+                return True
+            self.power_off()
+            time.sleep(0.3)
+        return False
+
+    def load_asrp(self):
+        """The ASRP parameters: each 5A 02 chunk of the file behind 00 00,
+        then the checksum the chip computed and boot."""
+        data = open(ASRP, "rb").read()
+        if self.reg(0x34) != "0000":
+            self.w("034w0000")
+        time.sleep(0.005)
+        self.w("00fw4404")
+        self.gpio.set_value(WAKE, Value.ACTIVE)
+        time.sleep(0.001)
+        self.gpio.set_value(WAKE, Value.INACTIVE)
+        time.sleep(0.001)
+        self.speed(3000000)
+        total = 0x5A + 0x0E
+        i = 0
+        while i + 10 <= len(data):
+            if data[i:i + 2] != b"\x5a\x02":
+                i += 2
+                continue
+            words, addr = struct.unpack_from("<II", data, i + 2)
+            chunk = data[i + 10:i + 10 + words * 2]
+            total += 0x5A + 0x02 + words + addr + sum(struct.unpack("<%dH" % words, chunk))
+            self.write(b"\x00\x00" + data[i:i + 10])
+            time.sleep(0.002)
+            self.write(chunk)
+            i += 10 + words * 2
+        self.write(bytes([0x00, 0x00, 0x5A, 0x0E]))
+        time.sleep(0.001)
+        ok = self.read(7)[3:7] == struct.pack("<I", total & 0xffffffff)
+        self.write(bytes([0x00, 0x00, 0x5A, 0x0B]))
+        time.sleep(0.001)
+        self.speed(1000000)
+        time.sleep(0.01)
+        return ok and self.alive()
+
+    def start(self, raw):
+        # va-config of the stock device tree (between: msleep).
+        self.w("029w0020", "01bw0020", "009w1800", "022w1001", "033w0076", "023w0000",
+               "01aw0013", "015w9494", "010w4002")
+        time.sleep(0.064)
+        self.w("00cw2710", "024w0a48", "025w0267")
+        time.sleep(0.1)
+        self.w("025w0000", "024w0000")
+        time.sleep(0.05)
+        # DSP clock from the PLL: step 16, 98.304 MHz.
+        self.w("023w%04x" % (int(self.reg(0x23), 16) & 0xFFE0), "010wf000")
+        time.sleep(0.04)
+        self.w("01ew1010")
+        time.sleep(0.04)
+        if not self.alive():
+            return False
+        if not raw and not self.load_asrp():
+            log("ASRP parameters did not load")
+            return False
+        # TDM0 RX, from the host codec.
+        self.w("031w0000", "036w9012")
+        self.ioport(0x80800000, 0x0080405d)
+        self.ioport(0x80800004, 0x00002064)
+        self.ioport(0x80800006, 0x103f003f)
+        self.ioport(0x8080000a, 0x00000005)
+        if not raw:
+            # ASRP: second init, delay, AEC outputs to TX 1 and 2, gains,
+            # the algorithm on.
+            self.w("038w003a", "00fw4405", "107w0001", "109w0400", "109w0501",
+                   "10aw0000", "10bw059f", "034w0003")
+            time.sleep(0.03)
+        # TDM0 TX to the SoC: I2S master, 2 channels, 16 kHz.
+        self.w("031w0000", "037w9010")
+        self.ioport(0x80804000, 0x00804052)
+        self.ioport(0x80804004, 0x00641064)
+        self.ioport(0x80804006, 0x101f003f)
+        self.ioport(0x8080400a, 0x00000055)
+        self.w("01fw0000", "011w0e10", "011w1eee", "011w22ee", "011w3ee3", "011w4eee",
+               "011w5e10", "011w6eee", "011w7eee")
+        self.w("013w3210" if raw else "013wffff")
+        # The microphones: SAR and sigma-delta ADC, analog gain.
+        self.w("024w0a48")
+        time.sleep(0.001)
+        self.w("025w0267")
+        time.sleep(0.001)
+        self.w("016w8d8b", "031w0304")
+        time.sleep(0.04)
+        return self.alive() and self.reg(0x31) == "0304"
+
+
+def main():
+    chip = Dbmd8()
+    for attempt in range(3):
+        if not chip.boot():
+            log("the DBMD8 did not boot")
+            return 1
+        if chip.start("--raw" in sys.argv):
+            break
+        log("the usecase did not start, booting again")
+        chip.power_off()
+        time.sleep(0.3)
+    else:
+        return 1
+    log("streaming the microphones")
+    signal.signal(signal.SIGTERM, lambda *_a: sys.exit(0))
+    try:
+        while True:
+            time.sleep(3600)
+    finally:
+        chip.power_off()
+
+
+if __name__ == "__main__":
+    sys.exit(main())

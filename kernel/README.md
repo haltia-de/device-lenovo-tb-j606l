@@ -34,11 +34,11 @@ packs the modules as `<work>/modules.tar` for `rootfs/build-rootfs.sh`
   amplifier's register profile from the stock `awinic/aw882xx_acf.bin` and
   turns the profile's four-slot TDM frame into the two-slot I2S frame the
   LPASS primary MI2S port sends.
-- `0007` driver for the ES7210 microphone ADC (Everest's Tab P11 register
-  sequences from Lenovo's sources) and secondary MI2S capture in the
-  sm8250 machine driver: 24-bit samples in 32-bit slots. The microphones
-  pass through a DSP Group DBMD8 voice processor, which has no driver yet,
-  so capture carries noise only.
+- `0007` secondary MI2S capture for the microphones: the DBMD8 voice
+  processor drives the clocks (2 channels, 16 kHz, 32-bit slots), and the
+  sm8250 machine driver makes `SECONDARY_MI2S_TX` a clock consumer. Also a
+  small driver for the ES7210 ADC on the same port (Everest's Tab P11
+  register sequences), the capture link's codec.
 - `0008` double tap to wake. The panel keeps the NT36523W (a TDDI chip)
   powered and out of reset while the display sleeps
   (`novatek,tddi-touch-wake`). The touch driver puts its half into the

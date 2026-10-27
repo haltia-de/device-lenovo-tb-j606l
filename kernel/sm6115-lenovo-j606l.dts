@@ -18,12 +18,19 @@
 	};
 
 	/* Four AW88258 speaker amplifiers on the LPASS primary MI2S port
-	 * (data line 1); the ES7210 microphone ADC on the secondary one. */
+	 * (data line 1). The microphones come from the DBMD8 voice processor on
+	 * the secondary port (data line 1, the DBMD8 drives the clocks); the
+	 * WCD937x biases them while something records. */
 	sound {
 		compatible = "qcom,qrb4210-rb2-sndcard";
 		model = "Lenovo-TB-J606L";
 		pinctrl-0 = <&lpi_i2s1_active>, <&lpi_i2s2_active>;
 		pinctrl-names = "default";
+		/* The analog microphones on the DBMD8 take their bias from the
+		 * WCD937x: on while anything records from them. */
+		aux-devs = <&wcd937x>;
+		audio-routing = "MIC", "MIC BIAS1",
+				"MIC", "MIC BIAS3";
 
 		mm1-dai-link {
 			link-name = "MultiMedia1";
@@ -249,7 +256,8 @@
 	clock-frequency = <400000>;
 	status = "okay";
 
-	/* The microphones' ADC; vcc is L24, shared with the UFS. */
+	/* An ADC on the secondary MI2S data line 0 (Lenovo's AEC reference path,
+	 * not the microphones); vcc is L24, shared with the UFS. */
 	microphones: audio-codec@40 {
 		compatible = "everest,es7210";
 		reg = <0x40>;
@@ -367,7 +375,7 @@
 
 	dai@19 {
 		reg = <SECONDARY_MI2S_TX>;
-		qcom,sd-lines = <0>;
+		qcom,sd-lines = <1>;
 	};
 };
 
@@ -426,4 +434,230 @@
  * the display sleeps, to see the double tap that wakes the tablet. */
 &panel {
 	novatek,tddi-touch-wake;
+};
+
+/* The DSP Group DBMD8 voice processor in front of the microphones. There is
+ * no kernel driver yet: haltia-dbmd8 drives it through spidev. */
+&spi5 {
+	status = "okay";
+
+	dbmd8@0 {
+		compatible = "rohm,dh2228fv";
+		reg = <0>;
+		spi-max-frequency = <5000000>;
+	};
+};
+
+/* J606F reserves gpio14-17; on the J606L they are SPI5 to the DBMD8 voice
+ * processor, as the stock kernel uses them. */
+&tlmm {
+	/delete-property/ gpio-reserved-ranges;
+};
+
+/* LPASS codec macros and SoundWire, as for the QRB4210 RB2 (Alexey Klimov's
+ * sm6115 LPASS series), for the WCD937x. */
+&soc {
+	rxmacro: codec@a600000 {
+		compatible = "qcom,sm6115-lpass-rx-macro";
+		reg = <0x0 0xa600000 0x0 0x1000>;
+		clocks = <&q6afecc LPASS_CLK_ID_RX_CORE_MCLK LPASS_CLK_ATTRIBUTE_COUPLE_NO>,
+			 <&q6afecc LPASS_CLK_ID_RX_CORE_NPL_MCLK LPASS_CLK_ATTRIBUTE_COUPLE_NO>,
+			 <&q6afecc LPASS_HW_DCODEC_VOTE LPASS_CLK_ATTRIBUTE_COUPLE_NO>,
+			 <&vamacro>;
+		clock-names = "mclk", "npl", "dcodec", "fsgen";
+		assigned-clocks = <&q6afecc LPASS_CLK_ID_RX_CORE_MCLK LPASS_CLK_ATTRIBUTE_COUPLE_NO>,
+				  <&q6afecc LPASS_CLK_ID_RX_CORE_NPL_MCLK LPASS_CLK_ATTRIBUTE_COUPLE_NO>;
+		assigned-clock-rates = <22579200>, <22579200>;
+		#clock-cells = <0>;
+		clock-output-names = "mclk";
+		#sound-dai-cells = <1>;
+	};
+
+	swr1: soundwire@a610000 {
+		compatible = "qcom,soundwire-v1.6.0";
+		reg = <0x0 0x0a610000 0x0 0x2000>;
+		interrupts = <GIC_SPI 297 IRQ_TYPE_LEVEL_HIGH>;
+		clocks = <&rxmacro>;
+		clock-names = "iface";
+		resets = <&lpass_audiocc 0>;
+		reset-names = "swr_audio_cgcr";
+		pinctrl-0 = <&lpass_rx_swr_active>;
+		pinctrl-names = "default";
+		label = "RX";
+		qcom,din-ports = <0>;
+		qcom,dout-ports = <5>;
+		qcom,ports-sinterval-low =	/bits/ 8 <0x03 0x1f 0x1f 0x07 0x00>;
+		qcom,ports-offset1 =		/bits/ 8 <0x00 0x00 0x0b 0x01 0x00>;
+		qcom,ports-offset2 =		/bits/ 8 <0x00 0x00 0x0b 0x00 0x00>;
+		qcom,ports-hstart =		/bits/ 8 <0xff 0x03 0xff 0xff 0xff>;
+		qcom,ports-hstop =		/bits/ 8 <0xff 0x06 0xff 0xff 0xff>;
+		qcom,ports-word-length =	/bits/ 8 <0x01 0x07 0x04 0xff 0xff>;
+		qcom,ports-block-pack-mode =	/bits/ 8 <0xff 0x00 0x01 0xff 0xff>;
+		qcom,ports-block-group-count =	/bits/ 8 <0xff 0xff 0xff 0xff 0x00>;
+		qcom,ports-lane-control =	/bits/ 8 <0x01 0x00 0x00 0x00 0x00>;
+		#sound-dai-cells = <1>;
+		#address-cells = <2>;
+		#size-cells = <0>;
+
+		wcd937x_rx: codec@0,4 {
+			compatible = "sdw20217010a00";
+			reg = <0 4>;
+			qcom,rx-port-mapping = <1 2 3 4 5>;
+		};
+	};
+
+	txmacro: codec@a620000 {
+		compatible = "qcom,sm6115-lpass-tx-macro";
+		reg = <0x0 0x0a620000 0x0 0x1000>;
+		clocks = <&q6afecc LPASS_CLK_ID_TX_CORE_MCLK LPASS_CLK_ATTRIBUTE_COUPLE_NO>,
+			 <&q6afecc LPASS_CLK_ID_TX_CORE_NPL_MCLK LPASS_CLK_ATTRIBUTE_COUPLE_NO>,
+			 <&q6afecc LPASS_HW_DCODEC_VOTE LPASS_CLK_ATTRIBUTE_COUPLE_NO>,
+			 <&vamacro>;
+		clock-names = "mclk", "npl", "dcodec", "fsgen";
+		assigned-clocks = <&q6afecc LPASS_CLK_ID_TX_CORE_MCLK LPASS_CLK_ATTRIBUTE_COUPLE_NO>,
+				  <&q6afecc LPASS_CLK_ID_TX_CORE_NPL_MCLK LPASS_CLK_ATTRIBUTE_COUPLE_NO>;
+		assigned-clock-rates = <19200000>, <19200000>;
+		#clock-cells = <0>;
+		clock-output-names = "mclk";
+		#sound-dai-cells = <1>;
+	};
+
+	lpass_audiocc: clock-controller@a6a9000 {
+		compatible = "qcom,sm6115-lpassaudiocc";
+		reg = <0x0 0x0a6a9000 0x0 0x1000>;
+		#reset-cells = <1>;
+	};
+
+	vamacro: codec@a730000 {
+		compatible = "qcom,sm6115-lpass-va-macro";
+		reg = <0x0 0x0a730000 0x0 0x1000>;
+		clocks = <&q6afecc LPASS_CLK_ID_TX_CORE_MCLK LPASS_CLK_ATTRIBUTE_COUPLE_NO>,
+			 <&q6afecc LPASS_HW_DCODEC_VOTE LPASS_CLK_ATTRIBUTE_COUPLE_NO>,
+			 <&q6afecc LPASS_CLK_ID_TX_CORE_NPL_MCLK LPASS_CLK_ATTRIBUTE_COUPLE_NO>;
+		clock-names = "mclk", "dcodec", "npl";
+		assigned-clocks = <&q6afecc LPASS_CLK_ID_TX_CORE_MCLK LPASS_CLK_ATTRIBUTE_COUPLE_NO>,
+				  <&q6afecc LPASS_CLK_ID_TX_CORE_NPL_MCLK LPASS_CLK_ATTRIBUTE_COUPLE_NO>;
+		assigned-clock-rates = <19200000>, <19200000>;
+		#clock-cells = <0>;
+		clock-output-names = "fsgen";
+		#sound-dai-cells = <1>;
+	};
+
+	swr0: soundwire@a740000 {
+		compatible = "qcom,soundwire-v1.6.0";
+		reg = <0x0 0x0a740000 0x0 0x2000>;
+		interrupts = <GIC_SPI 296 IRQ_TYPE_LEVEL_HIGH>,
+			     <GIC_SPI 79 IRQ_TYPE_LEVEL_HIGH>;
+		clocks = <&txmacro>;
+		clock-names = "iface";
+		resets = <&lpasscc 0>;
+		reset-names = "swr_audio_cgcr";
+		pinctrl-0 = <&lpass_tx_swr_active>;
+		pinctrl-names = "default";
+		label = "VA_TX";
+		qcom,din-ports = <3>;
+		qcom,dout-ports = <0>;
+		qcom,ports-sinterval-low =	/bits/ 8 <0x03 0x03 0x03>;
+		qcom,ports-offset1 =		/bits/ 8 <0x01 0x02 0x01>;
+		qcom,ports-offset2 =		/bits/ 8 <0x00 0x00 0x00>;
+		qcom,ports-hstart =		/bits/ 8 <0xff 0xff 0xff>;
+		qcom,ports-hstop =		/bits/ 8 <0xff 0xff 0xff>;
+		qcom,ports-word-length =	/bits/ 8 <0xff 0xff 0xff>;
+		qcom,ports-block-pack-mode =	/bits/ 8 <0xff 0xff 0xff>;
+		qcom,ports-block-group-count =	/bits/ 8 <0xff 0xff 0xff>;
+		qcom,ports-lane-control =	/bits/ 8 <0x00 0x00 0x00>;
+		#sound-dai-cells = <1>;
+		#address-cells = <2>;
+		#size-cells = <0>;
+
+		wcd937x_tx: codec@0,3 {
+			compatible = "sdw20217010a00";
+			reg = <0 3>;
+			qcom,tx-port-mapping = <1 1 2 3>;
+		};
+	};
+
+	lpasscc: clock-controller@a7ec000 {
+		compatible = "qcom,sm6115-lpasscc";
+		reg = <0x0 0x0a7ec000 0x0 0x1000>;
+		#reset-cells = <1>;
+	};
+};
+
+/ {
+	/* The battery rail; the WCD937x makes the mic bias from it. */
+	vph_pwr: regulator-vph-pwr {
+		compatible = "regulator-fixed";
+		regulator-name = "vph_pwr";
+		regulator-min-microvolt = <3700000>;
+		regulator-max-microvolt = <3700000>;
+		regulator-always-on;
+		regulator-boot-on;
+	};
+
+	wcd937x: codec {
+		compatible = "qcom,wcd9370-codec";
+		pinctrl-0 = <&wcd_reset_n>;
+		pinctrl-names = "default";
+		reset-gpios = <&tlmm 92 GPIO_ACTIVE_LOW>;
+		vdd-buck-supply = <&pm6125_l14>;
+		vdd-rxtx-supply = <&pm6125_l9>;
+		vdd-px-supply = <&pm6125_l9>;
+		vdd-mic-bias-supply = <&vph_pwr>;
+		qcom,micbias1-microvolt = <1800000>;
+		qcom,micbias2-microvolt = <1800000>;
+		qcom,micbias3-microvolt = <1800000>;
+		qcom,micbias4-microvolt = <1800000>;
+		qcom,mbhc-buttons-vthreshold-microvolt = <75000 150000 237000 500000 500000 500000 500000 500000>;
+		qcom,rx-device = <&wcd937x_rx>;
+		qcom,tx-device = <&wcd937x_tx>;
+		#sound-dai-cells = <1>;
+	};
+};
+
+&tlmm {
+	wcd_reset_n: wcd-reset-n-state {
+		pins = "gpio92";
+		function = "gpio";
+		drive-strength = <16>;
+		output-high;
+	};
+};
+
+&lpass_tlmm {
+	lpass_tx_swr_active: lpass-tx-swr-active-state {
+		clk-pins {
+			pins = "gpio0";
+			function = "swr_tx_clk";
+			drive-strength = <10>;
+			slew-rate = <3>;
+			bias-disable;
+		};
+
+		data-pins {
+			pins = "gpio1", "gpio2";
+			function = "swr_tx_data";
+			drive-strength = <10>;
+			slew-rate = <3>;
+			bias-bus-hold;
+		};
+	};
+
+	lpass_rx_swr_active: lpass-rx-swr-active-state {
+		clk-pins {
+			pins = "gpio3";
+			function = "swr_rx_clk";
+			drive-strength = <10>;
+			slew-rate = <3>;
+			bias-disable;
+		};
+
+		data-pins {
+			pins = "gpio4", "gpio5";
+			function = "swr_rx_data";
+			drive-strength = <10>;
+			slew-rate = <3>;
+			bias-bus-hold;
+		};
+	};
 };

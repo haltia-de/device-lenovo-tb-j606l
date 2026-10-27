@@ -6,6 +6,7 @@
 fw=/lib/firmware
 soc=$fw/qcom/sm6115/LENOVO/J606L
 [ -e $fw/novatek_ts_fw.bin ] && [ -e $soc/modem.mdt ] && [ -e $soc/a610_zap.mdt ] && [ -e $fw/awinic/aw882xx_acf.bin ] && \
+	[ -e $fw/dspg/dbmd8_va_fw.bin ] && \
 	[ -e /usr/share/qcom/sm6115/Lenovo/J606L/sensors/sns_reg.conf ] && exit 0
 super=
 for u in /sys/class/block/*/uevent; do
@@ -25,6 +26,9 @@ cp $mnt/firmware/a630_sqe.fw $fw/qcom/
 # Register profiles of the four AW88258 speaker amplifiers.
 mkdir -p $fw/awinic
 cp $mnt/firmware/awinic/aw882xx_acf.bin $fw/awinic/
+# The DBMD8 voice processor in front of the microphones (haltia-dbmd8).
+mkdir -p $fw/dspg
+cp $mnt/firmware/dbmd8_va_fw.bin $mnt/firmware/asrp_params_melon_aecnr_dual_mic_ga.bin $fw/dspg/
 umount $mnt
 rm -f "$img"
 

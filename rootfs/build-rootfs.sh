@@ -33,7 +33,7 @@ PACKAGES="alpine-base openrc busybox-openrc busybox-binsh eudev udev-init-script
 	adwaita-icon-theme gtk+3.0-lang desktop-file-utils tzdata xdg-utils
 	openssh openssh-server-pam doas earlyoom earlyoom-openrc
 	zstd qrtr rmtfs rmtfs-openrc tqftpserv tqftpserv-openrc linux-firmware-ath10k linux-firmware-qca bluez bluez-openrc bluez-btmgmt
-	hexagonrpcd hexagonrpcd-openrc libssc
+	hexagonrpcd hexagonrpcd-openrc libssc py3-libgpiod
 	bash htop nano e2fsprogs e2fsprogs-extra kmod util-linux python3
 	haltia-keys haltia-desktop haltia-music haltia-weather haltia-messenger"
 
@@ -90,6 +90,8 @@ install -D -m 644 "$SRC/rootfs/iio-sensor-proxy.confd" "$ROOT/etc/conf.d/iio-sen
 install -D -m 644 "$SRC/rootfs/50-haltia-j606l-sensors.rules" "$ROOT/etc/polkit-1/rules.d/50-haltia-j606l-sensors.rules"
 install -D -m 644 "$SRC/rootfs/device.conf" "$ROOT/etc/haltia/device.conf"
 install -D -m 755 "$SRC/rootfs/bt-address.start" "$ROOT/etc/local.d/10-bt-address.start"
+install -D -m 755 "$SRC/rootfs/haltia-dbmd8" "$ROOT/usr/sbin/haltia-dbmd8"
+install -D -m 755 "$SRC/rootfs/dbmd8.initd" "$ROOT/etc/init.d/dbmd8"
 install -D -m 755 "$SRC/rootfs/desktop.start" "$ROOT/etc/local.d/desktop.start"
 mkdir -p "$ROOT/etc/haltia"
 echo "$PACKAGES" | tr -s ' \t\n' '\n' | sed '/^$/d' > "$ROOT/etc/haltia/firstboot.packages"
