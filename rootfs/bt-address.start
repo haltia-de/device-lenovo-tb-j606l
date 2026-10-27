@@ -12,5 +12,16 @@
 	h=$(printf 'haltia-bt-%s' "$serial" | sha256sum | cut -c1-12)
 	b0=$(printf '%02x' $(( (0x${h%??????????} & 0xfc) | 0x02 )))
 	addr=$(echo "$b0${h#??}" | sed 's/../&:/g; s/:$//')
-	btmgmt -i hci0 public-addr "$addr" >/dev/null 2>&1
+	# The controller can still be setting up and reject the address; retry
+	# until BlueZ lists it. btmgmt quits before the reply when its input is
+	# closed, so it reads from a pipe that stays open a few seconds.
+	for i in $(seq 1 30); do
+		bluetoothctl list </dev/null 2>/dev/null | grep -q '^Controller' && {
+			logger -t bt-address "hci0 is $addr"
+			exit 0
+		}
+		sleep 3 | timeout 8 btmgmt -i hci0 public-addr "$addr" >/dev/null 2>&1
+		sleep 2
+	done
+	logger -t bt-address "hci0 did not take $addr"
 ) &
