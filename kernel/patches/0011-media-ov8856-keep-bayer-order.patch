@@ -1,0 +1,49 @@
+media: i2c: ov8856: Keep the chosen Bayer order.
+
+update_pad_format stored the Bayer order in cur_mbus_index for any
+format it filled in. get_format for the active state passes a format
+without a code, and open() fills in the try format, so both reset the
+order to the mode default: a BGGR format set by libcamera read back as
+GRBG and link validation failed with EPIPE. Only an active set_format
+now changes cur_mbus_index, and get_format reports it.
+
+--- a/drivers/media/i2c/ov8856.c	2026-10-27 17:22:29.937109290 +0300
++++ b/drivers/media/i2c/ov8856.c	2026-10-27 17:27:24.514203794 +0300
+@@ -1990,7 +1990,6 @@
+ 	if (index == ARRAY_SIZE(ov8856_mbus_codes))
+ 		index = mode->default_mbus_index;
+ 	fmt->code = ov8856_mbus_codes[index];
+-	ov8856->cur_mbus_index = index;
+ 	fmt->field = V4L2_FIELD_NONE;
+ }
+ 
+@@ -2138,6 +2137,7 @@
+ 	struct ov8856 *ov8856 = to_ov8856(sd);
+ 	const struct ov8856_mode *mode;
+ 	s32 vblank_def, h_blank;
++	int i;
+ 
+ 	mode = v4l2_find_nearest_size(ov8856->priv_lane->supported_modes,
+ 				      ov8856->modes_size,
+@@ -2150,6 +2150,9 @@
+ 		*v4l2_subdev_state_get_format(sd_state, fmt->pad) = fmt->format;
+ 	} else {
+ 		ov8856->cur_mode = mode;
++		for (i = 0; i < ARRAY_SIZE(ov8856_mbus_codes); i++)
++			if (ov8856_mbus_codes[i] == fmt->format.code)
++				ov8856->cur_mbus_index = i;
+ 		__v4l2_ctrl_s_ctrl(ov8856->link_freq, mode->link_freq_index);
+ 		__v4l2_ctrl_s_ctrl_int64(ov8856->pixel_rate,
+ 					 to_rate(ov8856->priv_lane->link_freq_menu_items,
+@@ -2187,8 +2190,10 @@
+ 	if (fmt->which == V4L2_SUBDEV_FORMAT_TRY)
+ 		fmt->format = *v4l2_subdev_state_get_format(sd_state,
+ 							    fmt->pad);
+-	else
++	else {
++		fmt->format.code = ov8856_mbus_codes[ov8856->cur_mbus_index];
+ 		ov8856_update_pad_format(ov8856, ov8856->cur_mode, &fmt->format);
++	}
+ 
+ 	mutex_unlock(&ov8856->mutex);
+ 

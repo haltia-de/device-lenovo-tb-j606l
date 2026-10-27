@@ -1,0 +1,3 @@
+# libcamera's software ISP allocates its buffers from the DMA-BUF heaps,
+# which the kernel makes root-only. The video group runs the camera.
+SUBSYSTEM=="dma_heap", GROUP="video", MODE="0660"

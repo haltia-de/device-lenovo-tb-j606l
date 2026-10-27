@@ -34,6 +34,7 @@ PACKAGES="alpine-base openrc busybox-openrc busybox-binsh eudev udev-init-script
 	openssh openssh-server-pam doas earlyoom earlyoom-openrc
 	zstd qrtr rmtfs rmtfs-openrc tqftpserv tqftpserv-openrc linux-firmware-ath10k linux-firmware-qca bluez bluez-openrc bluez-btmgmt
 	hexagonrpcd hexagonrpcd-openrc libssc py3-libgpiod
+	libcamera libcamera-ipa libcamera-tools libcamera-gstreamer
 	bash htop nano e2fsprogs e2fsprogs-extra kmod util-linux python3
 	haltia-keys haltia-desktop haltia-music haltia-weather haltia-messenger"
 
@@ -83,6 +84,7 @@ install -D -m 644 "$SRC/rootfs/91-fastrpc.rules" "$ROOT/etc/udev/rules.d/91-fast
 install -D -m 644 "$SRC/rootfs/81-j606l-sensors.rules" "$ROOT/etc/udev/rules.d/81-j606l-sensors.rules"
 install -D -m 644 "$SRC/rootfs/82-j606l-battery.rules" "$ROOT/etc/udev/rules.d/82-j606l-battery.rules"
 install -D -m 644 "$SRC/rootfs/83-j606l-bt-wake.rules" "$ROOT/etc/udev/rules.d/83-j606l-bt-wake.rules"
+install -D -m 644 "$SRC/rootfs/84-j606l-camera.rules" "$ROOT/etc/udev/rules.d/84-j606l-camera.rules"
 for s in hexagonrpcd-adsp-rootpd hexagonrpcd-adsp-sensorspd; do
 	install -D -m 644 "$SRC/rootfs/hexagonrpcd.confd" "$ROOT/etc/conf.d/$s"
 done

@@ -25,7 +25,8 @@ echo 'dtb-$(CONFIG_ARCH_QCOM)	+= sm6115-lenovo-j606l.dtb' >> "$K/arch/arm64/boot
 # Touch driver: only its own directory from the imported patch.
 (cd "$K" && git apply --include='drivers/input/touchscreen/nt36523/*' \
 	"$HERE/patches/0001-input-touchscreen-add-novatek-nt36523-spi.patch")
-for p in "$HERE"/patches/000[2-9]-*.patch; do
+for p in "$HERE"/patches/[0-9][0-9][0-9][0-9]-*.patch; do
+	case $p in */0001-*) continue ;; esac
 	patch -d "$K" -p1 -s < "$p"
 done
 

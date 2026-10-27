@@ -26,7 +26,7 @@ open(sys.argv[1], 'wb').write(gzip.compress(data, 9, mtime=0))
 PY
 python3 -I "$HERE/mkbootimg.py" --kernel "$OUT/arch/arm64/boot/Image.gz" \
 	--ramdisk "$TMP/ramdisk.cpio.gz" --dtb "$TMP/j606l.dtb" \
-	--cmdline "root=PARTLABEL=haltia rootwait rw init=/sbin/haltia-init clk_ignore_unused pd_ignore_unused regulator_ignore_unused console=tty0 loglevel=4 log_buf_len=4M deferred_probe_timeout=60" \
+	--cmdline "root=PARTLABEL=haltia rootwait rw init=/sbin/haltia-init clk_ignore_unused pd_ignore_unused regulator_ignore_unused console=tty0 loglevel=4 log_buf_len=4M deferred_probe_timeout=60 cma=256M" \
 	--header_version 2 --pagesize 4096 --base 0 --kernel_offset 0x8000 \
 	--ramdisk_offset 0x1000000 --second_offset 0 --tags_offset 0x100 \
 	--dtb_offset 0x1f00000 --os_version 11.0.0 --os_patch_level 2023-07 -o "$IMG"

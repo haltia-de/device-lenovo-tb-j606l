@@ -720,6 +720,9 @@
 				pinctrl-0 = <&mclk2_default>;
 				pinctrl-names = "default";
 				reset-gpios = <&tlmm 19 GPIO_ACTIVE_LOW>;
+				orientation = <0>;
+				/* Upright when the tablet is held in landscape, the shell's normal. */
+				rotation = <0>;
 				avdd-supply = <&cam_avdd>;
 				dvdd-supply = <&cam_dvdd>;
 
