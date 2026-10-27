@@ -53,9 +53,10 @@ CCI без голоса интерконнекта роняет SoC в EDL (900e
   считал ошибки CRC и ECC на каждом пакете, кадров не было. Середина окна
   D-PHY (115 нс + 8 UI) работает на 180 и 360 МГц.
 - DTS: CCI, CAMSS (по образцу `agatti.dtsi`), фиксированные регуляторы на
-  GPIO 112/108, OV8856 (`link-frequencies` 360 и 180 МГц, `rotation = 270` от книжной ориентации
-  панели, как `sensor-position-roll` в стоке; `haltia_kit` поворачивает
-  картинку на это и на поворот экрана из `$XDG_RUNTIME_DIR/haltia/rotation`).
+  GPIO 112/108, OV8856 (`link-frequencies` 360 и 180 МГц, `rotation = 90`: `haltia_kit` поворачивает
+  картинку на это и на поворот экрана из `$XDG_RUNTIME_DIR/haltia/rotation`,
+  потом зеркалит. Проверено на планшете: 0 — верх вправо, 270 (как
+  `sensor-position-roll` в стоке) — вверх ногами, 90 — прямо).
 - Конфиг: `VIDEO_QCOM_CAMSS`, `I2C_QCOM_CCI`, `VIDEO_OV8856`, кучи DMA-BUF.
   В cmdline `cma=256M`: программный ISP берёт буферы из CMA, 32 МБ не хватало.
 - Rootfs: `libcamera`, `libcamera-ipa`, `libcamera-tools`,
