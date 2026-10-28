@@ -4,7 +4,8 @@
 # between the real time and the RTC and add it at boot.
 #
 #   haltia-rtc restore   set the system clock to RTC + offset (boot)
-#   haltia-rtc save      store the offset, if the clock looks right
+#   haltia-rtc save      store the offset, if the clock looks right; run as
+#                        ntp, the owner of $DIR
 #   haltia-rtc <event>   the same as save; busybox ntpd -S runs it after it
 #                        steps the clock and every 11 minutes
 RTC=/sys/class/rtc/rtc0/since_epoch
@@ -16,17 +17,26 @@ rtc() {
 	cat "$RTC" 2>/dev/null
 }
 
+# Only plain integers reach the arithmetic (the offset file belongs to ntp).
+integer() {
+	case $1 in
+	'' | - | *[!0-9-]* | ?*-*) return 1 ;;
+	esac
+}
+
 case "$1" in
 restore)
 	r=$(rtc) || exit 0
 	off=$(cat "$OFFSET" 2>/dev/null) || exit 0
-	[ -n "$r" ] && [ -n "$off" ] || exit 0
-	date -s "@$((r + off))" >/dev/null
+	integer "$r" && integer "$off" || exit 0
+	t=$((r + off))
+	[ "$t" -ge "$SANE" ] || exit 0
+	date -s "@$t" >/dev/null
 	;;
 *)
 	r=$(rtc) || exit 0
 	now=$(date +%s)
-	[ -n "$r" ] && [ "$now" -ge "$SANE" ] || exit 0
+	integer "$r" && [ "$now" -ge "$SANE" ] || exit 0
 	echo $((now - r)) > "$OFFSET.new" && mv "$OFFSET.new" "$OFFSET"
 	;;
 esac

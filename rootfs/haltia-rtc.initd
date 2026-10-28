@@ -18,6 +18,8 @@ start() {
 
 stop() {
 	ebegin "Saving the RTC offset"
-	/usr/sbin/haltia-rtc save
+	# As ntp, the owner of the offset's directory: root would follow
+	# whatever that user left there.
+	su -s /bin/sh ntp -c "/usr/sbin/haltia-rtc save"
 	eend $?
 }
