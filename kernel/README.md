@@ -68,9 +68,7 @@ packs the modules as `<work>/modules.tar` for `rootfs/build-rootfs.sh`
 - `0017` psci-cpuidle initializes at late_initcall_sync. Its faux device
   probes once, and with the MPM as the CPU clusters' parent the PSCI
   domains come only from the deferred probes; cpuidle failed and the CPUs
-  only ran WFI. 7.3 still probes psci-cpuidle once. For now
-  `build-boot.sh` boots with `cpuidle.off=1`: with the idle states on, the
-  modem stalls at boot and Wi-Fi comes up 40 s late (issue #31).
+  only ran WFI. 7.3 still probes psci-cpuidle once.
 - `0018` the touch driver's ESD check workqueue says WQ_PERCPU; 7.3 warns
   about a workqueue that sets neither WQ_PERCPU nor WQ_UNBOUND.
 - `0019` the WCD937x SoundWire devices add their components from a work
