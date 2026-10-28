@@ -75,8 +75,10 @@ for s in swclock modules sysctl hostname bootmisc syslog; do
 	rc-update add $s boot
 done
 # polkit is not among them: D-Bus starts it on the first request, and a
-# second copy from OpenRC loses the bus name and fails.
-for s in dbus elogind seatd tqftpserv rmtfs hexagonrpcd-adsp-sensorspd dbmd8 networkmanager bluetooth sshd ntpd iio-sensor-proxy earlyoom local; do
+# second copy from OpenRC loses the bus name and fails. openrc-settingsd is
+# timedated for Настройки → «Дата и время»: it has no D-Bus activation file,
+# so without the service that page stays empty.
+for s in dbus elogind seatd tqftpserv rmtfs hexagonrpcd-adsp-sensorspd dbmd8 networkmanager bluetooth sshd ntpd openrc-settingsd iio-sensor-proxy earlyoom local; do
 	[ -e /etc/init.d/$s ] && rc-update add $s default
 done
 for s in mount-ro killprocs savecache; do
