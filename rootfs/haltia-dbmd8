@@ -41,13 +41,28 @@ def log(msg):
     print("haltia-dbmd8: " + msg, flush=True)
 
 
+def tlmm():
+    """The SoC's GPIO chip: its number moves with the PMIC chips probed
+    before it."""
+    for name in sorted(os.listdir("/dev")):
+        if name.startswith("gpiochip"):
+            path = "/dev/" + name
+            try:
+                with gpiod.Chip(path) as chip:
+                    if chip.get_info().label == "500000.pinctrl":
+                        return path
+            except OSError:
+                continue
+    raise OSError("no TLMM GPIO chip")
+
+
 class Dbmd8:
     def __init__(self):
         self.fd = os.open(SPI, os.O_RDWR)
         fcntl.ioctl(self.fd, SPI_IOC_WR_MODE, struct.pack("B", 0))
         fcntl.ioctl(self.fd, SPI_IOC_WR_BITS_PER_WORD, struct.pack("B", 8))
         self.hz = 0
-        self.gpio = gpiod.request_lines("/dev/gpiochip0", consumer="dbmd8", config={
+        self.gpio = gpiod.request_lines(tlmm(), consumer="dbmd8", config={
             (LDO, WAKE, RESET): gpiod.LineSettings(direction=Direction.OUTPUT,
                                                    output_value=Value.INACTIVE)})
 
