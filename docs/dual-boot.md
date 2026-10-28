@@ -7,7 +7,7 @@
 | Что | Где |
 |---|---|
 | Android | слот B, как и был: `boot_b`, `dtbo_b`, `vbmeta_b`, `super`, `userdata` |
-| Ядро Haltia | раздел `recovery_b` (образ boot v2: Linux 7.1, DTB J606L) |
+| Ядро Haltia | раздел `recovery_b` (образ boot v2: Linux 7.3, DTB J606L) |
 | Корень Haltia | новый раздел `haltia` (LUN 0, около 38,5 ГиБ, ext4) |
 | `userdata` Android | ужат до 64 ГиБ и отформатирован заново |
 

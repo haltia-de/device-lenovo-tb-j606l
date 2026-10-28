@@ -1,0 +1,89 @@
+ASoC: codecs: wcd937x: Add the SoundWire component after probe.
+
+The last of the RX and TX components to be added binds the codec, and
+the codec's probe waits up to 5 s for the TX device to be initialised.
+The SoundWire core takes a device's lock for its whole probe() and for
+every status change, so when the TX device came last, its own probe
+held off its initialisation: the wait timed out ("Initialization not
+complete", -110) and the sound card was gone until rebound. Which device
+came last changed with 7.3. Add the component from a work item instead.
+
+--- a/sound/soc/codecs/wcd937x.h
++++ b/sound/soc/codecs/wcd937x.h
+@@ -508,6 +508,8 @@
+ 	WCD937X_MAX_SWR_PORTS = WCD937X_DSD_PORT,
+ };
+ 
++#include <linux/workqueue.h>
++
+ struct wcd937x_priv;
+ struct wcd937x_sdw_priv {
+ 	struct sdw_slave *sdev;
+@@ -523,6 +525,9 @@
+ 	struct wcd937x_priv *wcd937x;
+ 	struct irq_domain *slave_irq;
+ 	struct regmap *regmap;
++	/* Adds the component once probe() has returned (see there). */
++	struct work_struct add_work;
++	bool added;
+ };
+ 
+ #if IS_ENABLED(CONFIG_SND_SOC_WCD937X_SDW)
+--- a/sound/soc/codecs/wcd937x-sdw.c
++++ b/sound/soc/codecs/wcd937x-sdw.c
+@@ -961,6 +961,20 @@
+ 	.interrupt_callback = wcd9370_interrupt_callback,
+ };
+ 
++static void wcd9370_add_component(struct work_struct *work)
++{
++	struct wcd937x_sdw_priv *wcd = container_of(work, struct wcd937x_sdw_priv,
++						    add_work);
++	struct device *dev = &wcd->sdev->dev;
++	int ret;
++
++	ret = component_add(dev, &wcd_sdw_component_ops);
++	if (ret)
++		dev_err(dev, "Failed to add component: %d\n", ret);
++	else
++		wcd->added = true;
++}
++
+ static int wcd9370_probe(struct sdw_slave *pdev,
+ 			 const struct sdw_device_id *id)
+ {
+@@ -1046,21 +1060,29 @@
+ 	}
+ 
+ 
+-	ret = component_add(dev, &wcd_sdw_component_ops);
+-	if (ret)
+-		return ret;
+-
+ 	/* Set suspended until aggregate device is bind */
+ 	pm_runtime_set_suspended(dev);
+ 
++	/*
++	 * The last component added binds the codec, and its probe waits for
++	 * the TX device to be initialised. The bus initialises a device only
++	 * after its probe() has returned, so adding the TX component from
++	 * here stalled the codec for its whole timeout and the card failed.
++	 */
++	INIT_WORK(&wcd->add_work, wcd9370_add_component);
++	schedule_work(&wcd->add_work);
++
+ 	return 0;
+ }
+ 
+ static void wcd9370_remove(struct sdw_slave *pdev)
+ {
+ 	struct device *dev = &pdev->dev;
++	struct wcd937x_sdw_priv *wcd = dev_get_drvdata(dev);
+ 
+-	component_del(dev, &wcd_sdw_component_ops);
++	cancel_work_sync(&wcd->add_work);
++	if (wcd->added)
++		component_del(dev, &wcd_sdw_component_ops);
+ }
+ 
+ static const struct sdw_device_id wcd9370_slave_id[] = {

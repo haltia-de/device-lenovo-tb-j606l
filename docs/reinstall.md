@@ -7,12 +7,14 @@ Android на `_b` после каждой пробы должен давать `
 
 ## 1. Ядро
 
-Источник — `TeamYogaBlade2/linux` `blade/v7.1` на коммите из `README.md`,
-простой копией (`git archive`), без изменений:
+Источник — Linux 7.3 с kernel.org, архив и его sha256 указаны в
+`kernel/README.md`, распакованный без изменений:
 
 ```
-S=/mnt/data/tmp/j606l-src-7dd2454 W=/mnt/data/tmp/j606l-r4
-git -C <клон> archive 7dd245445adf6eaa27018cf92fbd5a92ec0b118e | tar -x -C $S
+S=/mnt/data/tmp/mainline/linux-7.3 W=/mnt/data/tmp/mainline/j606l-7.3
+curl -LO https://cdn.kernel.org/pub/linux/kernel/v7.x/linux-7.3.tar.xz
+echo '87363c24f10e06321eb362765521094e94471f6bff8bce2d6b3e40f39f004953  linux-7.3.tar.xz' | sha256sum -c
+tar -xJf linux-7.3.tar.xz -C /mnt/data/tmp/mainline
 docker run --rm -u $(id -u):$(id -g) -v $PWD:/repo:ro -v $S:/src:ro -v $W:/work \
 	haltia-j606l-kbuild:1 sh -c 'JOBS=6 /repo/kernel/build-kernel.sh /src /work'
 kernel/build-boot.sh $W/build $W/haltia-boot.img

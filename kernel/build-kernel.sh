@@ -1,9 +1,8 @@
 #!/bin/sh
 # Build the TB-J606L kernel from a clean source tree.
 #   build-kernel.sh <pinned source tree> <work dir>
-# The source is TeamYogaBlade2/linux blade/v7.1 at the commit in README.md,
-# as a plain copy. Needs an aarch64 cross toolchain (CROSS_COMPILE, default
-# aarch64-linux-gnu-). Leaves <work>/build (the build tree, for
+# The source is the unpacked linux-7.3 tarball named in README.md. Needs an
+# aarch64 cross toolchain (CROSS_COMPILE, default aarch64-linux-gnu-). Leaves <work>/build (the build tree, for
 # build-boot.sh) and <work>/modules.tar (for rootfs/build-rootfs.sh).
 set -eu
 HERE=$(cd "$(dirname "$0")" && pwd)
