@@ -1,0 +1,73 @@
+net: qrtr: Answer a remote HELLO and stop dropping packets before ours.
+
+7.3 moved the HELLO handshake into the core: it sends HELLO from a work
+item when the endpoint registers, drops every other packet to the node
+until that HELLO went out, and the name service no longer says hello
+back. On the TB-J606L the modem then often announced only 2 of its 42
+services and its watchdog fired 40 s later ("DOG detects stalled
+initialization"), at about every second cold boot, and Wi-Fi came up
+late. With the 7.2 behaviour it did not happen. Keep the core's HELLO,
+but send packets that come before it as 7.2 did, and let the name
+service answer every remote HELLO again.
+
+--- a/net/qrtr/af_qrtr.c
++++ b/net/qrtr/af_qrtr.c
+@@ -349,14 +349,6 @@
+ 	size_t len = skb->len;
+ 	int rc, confirm_rx;
+ 
+-	mutex_lock(&node->ep_lock);
+-	if (!node->hello_sent && type != QRTR_TYPE_HELLO) {
+-		mutex_unlock(&node->ep_lock);
+-		kfree_skb(skb);
+-		return -EAGAIN;
+-	}
+-	mutex_unlock(&node->ep_lock);
+-
+ 	confirm_rx = qrtr_tx_wait(node, to->sq_node, to->sq_port, type);
+ 	if (confirm_rx < 0) {
+ 		kfree_skb(skb);
+--- a/net/qrtr/ns.c
++++ b/net/qrtr/ns.c
+@@ -327,8 +327,41 @@
+ 	return 0;
+ }
+ 
++static int say_hello(struct sockaddr_qrtr *dest)
++{
++	struct qrtr_ctrl_pkt pkt;
++	struct msghdr msg = { };
++	struct kvec iv;
++	int ret;
++
++	iv.iov_base = &pkt;
++	iv.iov_len = sizeof(pkt);
++
++	memset(&pkt, 0, sizeof(pkt));
++	pkt.cmd = cpu_to_le32(QRTR_TYPE_HELLO);
++
++	msg.msg_name = (struct sockaddr *)dest;
++	msg.msg_namelen = sizeof(*dest);
++
++	ret = kernel_sendmsg(qrtr_ns.sock, &msg, &iv, 1, sizeof(pkt));
++	if (ret < 0)
++		pr_err("failed to send hello msg\n");
++
++	return ret;
++}
++
+ static int ctrl_cmd_hello(struct sockaddr_qrtr *sq)
+ {
++	int ret;
++
++	/*
++	 * Say hello back, as before 7.3: a remote that missed the HELLO
++	 * the core sent at registration waits for one.
++	 */
++	ret = say_hello(sq);
++	if (ret < 0)
++		return ret;
++
+ 	return announce_servers(sq);
+ }
+ 

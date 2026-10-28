@@ -76,6 +76,12 @@ packs the modules as `<work>/modules.tar` for `rootfs/build-rootfs.sh`
   initialise while the TX device's own probe holds its lock; when TX came
   last the sound card failed after 5 s.
 
+- `0020` QRTR keeps the HELLO handshake of 7.2: packets to a node are sent
+  before the core's HELLO went out, and the name service answers every
+  remote HELLO. With the 7.3 handshake the modem often stalled at boot (2
+  of 42 services, its watchdog fired after 40 s) and Wi-Fi came up late
+  (issue #31).
+
 The SM6115 eGPIO function (formerly `0009`) is in mainline since 7.2.
 
 The touch firmware (`novatek_ts_fw.bin`) and the modem images are Lenovo's
