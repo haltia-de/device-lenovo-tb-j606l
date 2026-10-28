@@ -27,7 +27,7 @@ PACKAGES="alpine-base openrc busybox-openrc busybox-binsh eudev udev-init-script
 	upower networkmanager networkmanager-openrc networkmanager-wifi networkmanager-cli
 	wpa_supplicant iw wireless-regdb
 	iio-sensor-proxy iio-sensor-proxy-openrc feedbackd feedbackd-device-themes
-	pulseaudio pulseaudio-alsa pulseaudio-utils alsa-plugins-pulse alsa-utils alsa-ucm-conf
+	pulseaudio pulseaudio-alsa pulseaudio-utils pulseaudio-bluez alsa-plugins-pulse alsa-utils alsa-ucm-conf
 	firefox mobile-config-firefox foot grim fuzzel gtk-layer-shell mako
 	py3-gobject3 py3-pillow py3-cairo font-noto font-noto-emoji font-dejavu
 	adwaita-icon-theme gtk+3.0-lang desktop-file-utils tzdata xdg-utils
