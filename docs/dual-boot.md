@@ -122,7 +122,9 @@ PulseAudio. Профили регистров усилителей — сток�
 синхронизации и служба — при выключении (`/var/lib/haltia/rtc/offset`).
 
 Сон: s2idle через хук `/usr/lib/haltia/hooks/suspend` (`rootfs/haltia-suspend`),
-будят двойной тап и кнопка питания. Глубокий сон SoC (`vlow`/`vmin` RPM) пока
+будят двойной тап, кнопка питания и открытие чехла. Закрытый чехол
+(датчик Холла `gpio-keys-lid`) гасит экран через `haltia-sleep` (haltia-de/shell#87),
+logind крышку не трогает. Глубокий сон SoC (`vlow`/`vmin` RPM) пока
 не достигается. Подробности — [sleep.md](sleep.md).
 
 Фронтальная камера (OV8856) работает через CAMSS и libcamera: см.
