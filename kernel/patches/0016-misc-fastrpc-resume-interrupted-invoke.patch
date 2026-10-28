@@ -12,7 +12,7 @@ answer, as the downstream adsprpc driver does
 
 --- a/drivers/misc/fastrpc.c
 +++ b/drivers/misc/fastrpc.c
-@@ -249,6 +249,8 @@
+@@ -285,6 +285,8 @@
  	struct fastrpc_invoke_args *args;
  	struct fastrpc_buf_overlap *olaps;
  	struct fastrpc_channel_ctx *cctx;
@@ -21,7 +21,7 @@ answer, as the downstream adsprpc driver does
  };
  
  struct fastrpc_session_ctx {
-@@ -1263,6 +1265,31 @@
+@@ -1368,6 +1370,31 @@
  		return -EPERM;
  	}
  
@@ -53,19 +53,19 @@ answer, as the downstream adsprpc driver does
  	ctx = fastrpc_context_alloc(fl, kernel, sc, args);
  	if (IS_ERR(ctx))
  		return PTR_ERR(ctx);
-@@ -1278,6 +1305,7 @@
- 	if (err)
- 		goto bail;
+@@ -1390,6 +1417,7 @@
+ 	if (handle > FASTRPC_MAX_STATIC_HANDLE && fl->pd == USER_PD && fl->poll_mode)
+ 		ctx->is_polled = true;
  
 +wait:
- 	if (kernel) {
- 		if (!wait_for_completion_timeout(&ctx->work, 10 * HZ))
- 			err = -ETIMEDOUT;
-@@ -1310,6 +1338,7 @@
+ 	err = fastrpc_wait_for_completion(ctx, kernel);
+ 	if (err)
+ 		goto bail;
+@@ -1416,6 +1444,7 @@
  	}
  
  	if (err == -ERESTARTSYS) {
 +		ctx->interrupted = true;
+ 		spin_lock(&fl->lock);
  		list_for_each_entry_safe(buf, b, &fl->mmaps, node) {
  			list_del(&buf->node);
- 			list_add_tail(&buf->node, &fl->cctx->invoke_interrupted_mmaps);
