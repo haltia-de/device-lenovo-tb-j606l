@@ -1,0 +1,23 @@
+#!/sbin/openrc-run
+# Set the clock from the read-only PMIC RTC plus the saved offset, and save
+# the offset again on the way down (haltia-rtc).
+
+description="Keep the clock across reboots"
+
+depend() {
+	need localmount
+	after swclock
+	before ntpd
+}
+
+start() {
+	ebegin "Setting the clock from the RTC"
+	/usr/sbin/haltia-rtc restore
+	eend $?
+}
+
+stop() {
+	ebegin "Saving the RTC offset"
+	/usr/sbin/haltia-rtc save
+	eend $?
+}

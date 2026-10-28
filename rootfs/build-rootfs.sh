@@ -95,6 +95,12 @@ install -D -m 644 "$SRC/rootfs/device.conf" "$ROOT/etc/haltia/device.conf"
 install -D -m 755 "$SRC/rootfs/bt-address.start" "$ROOT/etc/local.d/10-bt-address.start"
 install -D -m 755 "$SRC/rootfs/haltia-dbmd8" "$ROOT/usr/sbin/haltia-dbmd8"
 install -D -m 755 "$SRC/rootfs/haltia-suspend" "$ROOT/usr/lib/haltia/hooks/suspend"
+install -D -m 755 "$SRC/rootfs/haltia-rtc" "$ROOT/usr/sbin/haltia-rtc"
+install -D -m 755 "$SRC/rootfs/haltia-rtc.initd" "$ROOT/etc/init.d/haltia-rtc"
+# ntpd stores the RTC offset after each sync (haltia-firstboot gives the
+# directory to its user, which the package scripts create).
+install -d -m 755 "$ROOT/var/lib/haltia/rtc"
+sed -i 's|^NTPD_OPTS=.*|NTPD_OPTS="-N -p pool.ntp.org -S /usr/sbin/haltia-rtc"|' "$ROOT/etc/conf.d/ntpd"
 install -D -m 755 "$SRC/rootfs/dbmd8.initd" "$ROOT/etc/init.d/dbmd8"
 install -D -m 755 "$SRC/rootfs/desktop.start" "$ROOT/etc/local.d/desktop.start"
 mkdir -p "$ROOT/etc/haltia"
