@@ -49,11 +49,12 @@ The J606F one-shot image from 23 October stays unused (ADR 0101).
 - `backups/` and `artifacts/` are git-ignored. Backups hold device-unique
   data. Do not commit them.
 
-## What a later change may add
+## Documented port status
 
-A J606L device tree derived from the upstream J606F tree, a boot image
-for the inactive slot, and a device profile (`device.conf`, the suspend
-hook). The first picture is phoc on DRM, without a hybris island. The
-daily bar is display, touch, Wi-Fi, sound, sleep, the power button and
-rotation. LTE, the camera, the pen, the pogo keyboard and the GPU come
-after that bar.
+The laboratory unit has Haltia installed alongside Android on slot B.
+The Haltia kernel is in `recovery_b`, with its root in the separate
+`haltia` partition; the active slot stays B. `docs/dual-boot.md` describes
+the working port and known limitations. This is the documented laboratory
+status, not a public release or a new hardware verification. The daily
+bar remains display, touch, Wi-Fi, sound, sleep, the power button and
+rotation.
