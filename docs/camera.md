@@ -40,8 +40,8 @@ CCI без голоса интерконнекта роняет SoC в EDL (900e
 
 ## Что сделано
 
-- Патч `0009-pinctrl-sm6115-egpio.patch`: функция `egpio` для GPIO 98–112 и
-  `egpio_func = 9`, как у QCM2290. Ядро ставит бит само, когда пин берут как GPIO.
+- Функция `egpio` для GPIO 98–112 и `egpio_func = 9`, как у QCM2290: с 7.2
+  она в основной ветке (раньше патч `0009`). Ядро ставит бит само, когда пин берут как GPIO.
 - Патч `0010-media-camss-add-sm6115.patch`: `qcom,sm6115-camss` — CSID и TFE
   от QCM2290 (TFE 340) и третий CSIPHY.
 - Патч `0011-media-ov8856-keep-bayer-order.patch`: `get_format` и `open()`

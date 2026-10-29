@@ -1,0 +1,17 @@
+input: nt36523: Name the ESD check workqueue per-CPU.
+
+Since 7.3 alloc_workqueue() warns when a caller sets neither WQ_PERCPU
+nor WQ_UNBOUND. The ESD check queue had the per-CPU default; say so.
+
+--- a/drivers/input/touchscreen/nt36523/nt36xxx.c
++++ b/drivers/input/touchscreen/nt36523/nt36xxx.c
+@@ -1670,7 +1670,8 @@
+ 	NVT_LOG("NVT_TOUCH_ESD_PROTECT is %d\n", NVT_TOUCH_ESD_PROTECT);
+ #if NVT_TOUCH_ESD_PROTECT
+ 	INIT_DELAYED_WORK(&nvt_esd_check_work, nvt_esd_check_func);
+-	nvt_esd_check_wq = alloc_workqueue("nvt_esd_check_wq", WQ_MEM_RECLAIM, 1);
++	nvt_esd_check_wq = alloc_workqueue("nvt_esd_check_wq",
++		WQ_MEM_RECLAIM | WQ_PERCPU, 1);
+ 	if (!nvt_esd_check_wq) {
+ 		NVT_ERR("nvt_esd_check_wq create workqueue failed\n");
+ 		ret = -ENOMEM;

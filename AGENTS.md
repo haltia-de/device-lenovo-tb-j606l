@@ -39,6 +39,8 @@ The J606F one-shot image from 23 October stays unused (ADR 0101).
 - `docs/dossier.md` is the hardware record from 23 October 2026.
 - `docs/dual-boot.md`, `docs/reinstall.md` and `docs/camera.md` describe the
   working port: the dual boot, a clean install, the cameras.
+- `docs/kernel-7.3.md` records the move to mainline 7.3, `docs/otg.md` the
+  OTG trial, `docs/upstream.md` where the work can go upstream.
 - `docs/adr/0100-follow-the-haltia-plan.md` binds this repository to the plan.
 - `docs/adr/0101-oneshot-j606f-boot-retired.md` records the write word and
   retires the J606F one-shot boot. An ADR is a record. A later change is a

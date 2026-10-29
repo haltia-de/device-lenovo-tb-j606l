@@ -68,12 +68,14 @@ depmod -a "$(uname -r)" 2>/dev/null
 for s in devfs dmesg sysfs udev udev-trigger udev-settle; do
 	rc-update add $s sysinit
 done
-# The PMIC RTC cannot be set: keep time across reboots from the shutdown
-# stamp (swclock) until ntpd has the network. Without it the clock starts
-# in 1970 and OpenRC skips services over the "skewed" dependency cache.
-for s in swclock modules sysctl hostname bootmisc syslog; do
+# The PMIC RTC cannot be set: haltia-rtc sets the clock from it plus the
+# offset ntpd last confirmed, with swclock's shutdown stamp before it.
+# Without them the clock starts in 1970 and OpenRC skips services over the
+# "skewed" dependency cache.
+for s in swclock haltia-rtc modules sysctl hostname bootmisc syslog; do
 	rc-update add $s boot
 done
+chown ntp:ntp /var/lib/haltia/rtc
 # polkit is not among them: D-Bus starts it on the first request, and a
 # second copy from OpenRC loses the bus name and fails. openrc-settingsd is
 # timedated for Настройки → «Дата и время»: it has no D-Bus activation file,
