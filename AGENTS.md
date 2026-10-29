@@ -57,5 +57,4 @@ The Haltia kernel is in `recovery_b`, with its root in the separate
 the working port and known limitations. This is the documented laboratory
 status, not a public release or a new hardware verification. The daily
 bar remains display, touch, Wi-Fi, sound, sleep, the power button and
-rotation. LTE, the camera, the pen, the pogo keyboard and the GPU come
-after that bar.
+rotation.
