@@ -1,0 +1,33 @@
+{
+  "kernel_source_pin": "7dd245445adf6eaa27018cf92fbd5a92ec0b118e",
+  "toolchain_image": "sha256:b2bed76c6f4dbc90ae597e2b9ef7c51cfe1fbf70310c42eeccfcc152c96cc4b5",
+  "build_id_toolchain_seed": "sha256:32e11b67e8d63a43ba674de8f1725f809d02649e183ad68a2e3c9e5e2ba44115",
+  "build_id": "haltia-j606l-11d85e24d551ea08",
+  "config_sha256": "594961cca4a9aaf13d55ad649b15b6fe27f0f2e44f7e84eb34c92d6dee22eab6",
+  "init_binary_sha256": "3aa0f0947279504c6497295beb8d42e291b3703d066db15a215ddb8f85b83e40",
+  "image_gz_sha256": "67417cc337f00bbfc47dfa78629acbe98d13310116c4b1d2a9e56fb07c43ce3a",
+  "dtb_sha256": "2bac2d11560ecf1ee69dfaf0dd3b12c7d531eacdee07e445541c01b556612cba",
+  "toolchain_package_versions": {
+    "binutils-aarch64-linux-gnu": "2.42-4ubuntu2.10",
+    "gcc-13-aarch64-linux-gnu": "13.3.0-6ubuntu2~24.04.1cross1",
+    "libc6-arm64-cross": "2.39-0ubuntu8cross1",
+    "libc6-dev-arm64-cross": "2.39-0ubuntu8cross1",
+    "linux-libc-dev-arm64-cross": "6.8.0-25.25cross1"
+  },
+  "verified_utc": "2026-10-25T06:55:07.443655+00:00",
+  "boot_image_sha256": "a9990c894d1a60f6bd06140cd34e6aa848b9880094059a6ba5780a2051ea4ff2",
+  "boot_image_bytes": 2056192,
+  "python_tests_passed": 13,
+  "native_c_pty_tests_passed": true,
+  "dtb_policy_passed": true,
+  "full_toolchain_package_count": 179,
+  "toolchain_lock_sha256": "38463fdaad053503a058cfb2aa386ff6a1312bc6bccc6fa8a0a56e9fae44e5d0",
+  "dockerfile_sha256": "b099118947bf4fa990fc0e1e85e1672b235816176d5d736b06500dd64f2a2328",
+  "independent_clean_build_matches_original_prototype": true,
+  "hardware_tested": false,
+  "packaging_runtime": {
+    "python": "3.12.3",
+    "zlib_compile": "1.3",
+    "zlib_runtime": "1.3"
+  }
+}

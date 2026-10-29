@@ -1,0 +1,29 @@
+# syntax=docker/dockerfile:1
+# Official Ubuntu Noble index, checked against registry metadata on 2026-10-25.
+FROM ubuntu@sha256:68ee22004a9109b44973313b02ff7b1de250f1de0f5ecb628d73f579aaff33ac
+ENV DEBIAN_FRONTEND=noninteractive
+# Minimal Noble lacks trust certificates. Bootstrap the locked CA package using
+# the default signed Ubuntu HTTP repositories before enabling HTTPS snapshots.
+RUN apt-get -o APT::Update::Error-Mode=any update \
+ && apt-get install -y --no-install-recommends ca-certificates=20260816ubuntu0.24.04.1 \
+ && rm -rf /var/lib/apt/lists/*
+COPY toolchain-packages.lock.tsv /j606l-packages.lock.tsv
+# Signed archive snapshot; preserve signature verification, permit historical dates.
+RUN printf '%s\n' \
+ 'deb [check-valid-until=no signed-by=/usr/share/keyrings/ubuntu-archive-keyring.gpg] https://snapshot.ubuntu.com/ubuntu/20261024T000000Z noble main universe restricted multiverse' \
+ 'deb [check-valid-until=no signed-by=/usr/share/keyrings/ubuntu-archive-keyring.gpg] https://snapshot.ubuntu.com/ubuntu/20261024T000000Z noble-updates main universe restricted multiverse' \
+ 'deb [check-valid-until=no signed-by=/usr/share/keyrings/ubuntu-archive-keyring.gpg] https://snapshot.ubuntu.com/ubuntu/20261024T000000Z noble-security main universe restricted multiverse' \
+ 'deb [check-valid-until=no signed-by=/usr/share/keyrings/ubuntu-archive-keyring.gpg] https://snapshot.ubuntu.com/ubuntu/20261024T000000Z noble-backports main universe restricted multiverse' \
+ > /etc/apt/sources.list \
+ && rm -f /etc/apt/sources.list.d/ubuntu.sources \
+ && apt-get -o APT::Update::Error-Mode=any update \
+ && set -- \
+ && while IFS="$(printf '\t')" read -r package version; do set -- "$@" "$package=$version"; done < /j606l-packages.lock.tsv \
+ && apt-get install -y --no-install-recommends --allow-downgrades "$@" \
+ && dpkg-query -W -f='${binary:Package}\t${Version}\n' > /j606l-installed.tsv \
+ && cmp /j606l-packages.lock.tsv /j606l-installed.tsv \
+ && dpkg-query -W -f='${binary:Package}\t${Version}\n' \
+ gcc-13-aarch64-linux-gnu binutils-aarch64-linux-gnu \
+ libc6-arm64-cross libc6-dev-arm64-cross linux-libc-dev-arm64-cross \
+ > /j606l-toolchain-packages.tsv \
+ && rm -rf /var/lib/apt/lists/*

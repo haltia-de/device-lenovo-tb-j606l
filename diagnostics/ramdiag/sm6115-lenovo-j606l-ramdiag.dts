@@ -1,0 +1,36 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR BSD-3-Clause)
+/* USB/RAM-only diagnostic for the measured TB-J606L specimen, not a daily port. */
+#include "sm6115p-lenovo-j606f.dts"
+
+/ {
+	model = "Lenovo Tab P11 TB-J606L RAM diagnostic";
+	compatible = "lenovo,j606l", "qcom,sm6115";
+	/* Measured SoC 444/platform 0x10000; selected stock LTE PVT overlay 34/3. */
+	qcom,msm-id = <444 0x10000>;
+	qcom,board-id = <34 3>;
+	chosen {
+		/delete-node/ framebuffer@5c000000;
+	};
+	reserved-memory {
+		/delete-node/ ramoops@ffc00000;
+	};
+};
+
+&gpu { status = "disabled"; };
+&gpu_zap_shader { /delete-property/ firmware-name; status = "disabled"; };
+&mdss { status = "disabled"; };
+&mdss_dsi0 { status = "disabled"; };
+&mdss_dsi0_phy { status = "disabled"; };
+&panel { status = "disabled"; };
+&sdhc_1 { status = "disabled"; };
+&sdhc_2 { status = "disabled"; };
+&ufs_mem_hc { status = "disabled"; };
+&ufs_mem_phy { status = "disabled"; };
+&remoteproc_adsp { /delete-property/ firmware-name; status = "disabled"; };
+&remoteproc_cdsp { /delete-property/ firmware-name; status = "disabled"; };
+&remoteproc_mpss { /delete-property/ firmware-name; status = "disabled"; };
+&wifi { status = "disabled"; };
+/* USB2 peripheral configuration is inherited from the compared J606F baseline.
+ * The RPM resource controller remains available for USB clocks/regulators;
+ * ADSP/CDSP/MPSS and their firmware are not started.
+ */
